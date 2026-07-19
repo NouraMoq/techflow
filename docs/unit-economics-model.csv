@@ -1,0 +1,23 @@
+metric,launch_pkg,pro_pkg,star_pkg,full_mgmt_pkg,agency_pkg
+monthly_price_sar,990,2490,7500,15000,9900
+setup_fee_sar,0,1500,3000,7500,5000
+account_manager_cost,0,0,2200,3500,2500
+content_writer_cost,0,0,1200,4000,800
+videographer_cost,0,0,0,0,0
+editor_cost,0,0,0,0,0
+storage_cost,5,30,40,60,80
+messaging_notifications_cost,10,25,20,30,40
+ai_cost,40,120,200,300,250
+support_cost,30,120,300,500,350
+third_party_tools_cost,25,60,100,200,150
+payment_gateway_cost,25,62,188,375,248
+sales_marketing_cost,80,200,800,1500,1000
+total_direct_monthly_cost,135,417,4248,8965,4418
+gross_profit_sar,855,2073,3252,6035,5482
+gross_margin_pct,86.4,83.3,43.4,40.2,55.4
+min_acceptable_price_sar,450,1390,7080,14942,7363
+breakeven_clients,10,6,6,7,6
+est_ltv_sar,15390,41460,78048,181050,153496
+est_cac_sar,1200,3000,8000,20000,12000
+ltv_cac_ratio,12.8,13.8,9.8,9.1,12.8
+note,"جميع القيم افتراضات قابلة للتعديل لأغراض النمذجة فقط ولا تشمل ضريبة القيمة المضافة (15%). تعريف: total_direct_monthly_cost = مجموع تكاليف التقديم المباشرة (لا يشمل sales_marketing الذي يُستخدم لحساب CAC). gross_profit = السعر الشهري ناقص التكلفة المباشرة. الأرقام مبنية على فرضيات تشغيلية أولية وتحتاج اعتماد الشركة والمختصين الماليين قبل الاعتماد.","","","",""

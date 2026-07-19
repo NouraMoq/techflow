@@ -1,0 +1,30 @@
+plan_id,plan_name_ar,plan_name_en,monthly_sar,annual_sar,setup_fee_sar,creators,users,social_accounts,monthly_projects,storage_gb,analytics_level,ai_level,support_level,managed_service,white_label,target_segment
+launch,الانطلاقة,Launch,990,9900,0,1,3,1,20,10,basic,limited,email,no,no,صانع محتوى فردي مبتدئ
+pro,الاحتراف,Pro,2490,24900,1500,1,8,3,50,100,advanced,higher,priority,no,no,صانع محتوى محترف / فريق صغير
+star,النجم,Star,7500,75000,3000,managed,portal-based,agreed,agreed,agreed,advanced+reports,managed,priority,yes,no,مشهور يريد خدمة مُدارة
+full_mgmt,الإدارة المتكاملة,Full Management,15000,150000,7500,managed,dedicated-team,custom,custom,custom,executive,managed,high-priority,yes,optional,مشهور كبير / علامة شخصية مؤسسية
+agency,الوكالات,Agency,9900,99000,5000,multiple,team-permissions,per-talent,aggregated,custom,aggregated,managed,priority+CSM,partial,optional,وكالات وإدارات مواهب
+
+addon_id,addon_name_ar,pricing_type,price_sar,notes
+brand_strategy_setup,إعداد استراتيجية العلامة الشخصية,from,3500,مقترح قابل للتعديل - يعتمد على حجم العمل
+account_audit,تحليل الحساب الحالي,fixed,1200,مقترح - تقرير تحليلي لمرة واحدة
+consulting_session,جلسة استشارية,fixed,750,مقترح - لكل جلسة (60 دقيقة)
+extra_script,كتابة سيناريو إضافي,from,350,مقترح - لكل سيناريو
+full_day_shoot,تصوير يوم كامل,from,4500,مقترح - لا يشمل مواقع خاصة أو معدات استثنائية
+half_day_shoot,تصوير نصف يوم,from,2500,مقترح - حسب الموقع
+video_editing,مونتاج فيديو,from,600,مقترح - لكل مقطع حتى مدة متفق عليها
+visual_design,تصميم غلاف/عناصر بصرية,from,400,مقترح - لكل حزمة عناصر
+ad_campaign_mgmt,إدارة حملة إعلانية,custom,0,حسب عرض - نسبة من الميزانية أو رسوم إدارة شهرية
+competitor_report,تقرير منافسين,fixed,1800,مقترح - تقرير لمرة واحدة
+crisis_management,إدارة أزمة,custom,0,حسب عرض - يعتمد على الحالة
+media_kit,إعداد Media Kit,from,1500,مقترح
+rate_card,إعداد Rate Card,from,900,مقترح
+contracts_mgmt,إدارة العقود,custom,0,حسب عرض - يعتمد على عدد ونوع العقود
+extra_user,إضافة مستخدم,fixed,120,مقترح - لكل مستخدم شهريًا
+extra_creator,إضافة صانع محتوى,fixed,650,مقترح - لكل صانع محتوى شهريًا
+extra_storage,مساحة تخزين إضافية,fixed,80,مقترح - لكل 50GB شهريًا
+extra_ai_credits,رصيد ذكاء اصطناعي إضافي,from,200,مقترح - لكل حزمة رصيد شهرية
+white_label,White Label,from,1500,مقترح - إضافة شهرية للوكالات
+client_team_training,تدريب فريق العميل,fixed,2000,مقترح - لكل جلسة تدريبية
+data_migration,ترحيل بيانات,from,1000,مقترح - حسب حجم البيانات
+custom_integration,تكامل مخصص,custom,0,حسب عرض - يعتمد على نطاق التكامل

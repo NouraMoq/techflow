@@ -1,0 +1,863 @@
+// ============================================================================
+// صانع المحتوى | Content Maker — Prisma schema
+// Local dev = SQLite (portable). Production target = PostgreSQL:
+//   - change `provider` to "postgresql" and DATABASE_URL,
+//   - enum-like fields are stored as String for portability (documented values
+//     in comments); on Postgres they can be promoted to native enums,
+//   - list/JSON fields are stored as JSON strings (helpers in src/lib/json.ts).
+// Multi-tenancy: every tenant-owned row carries tenantId + audit + soft delete.
+// ============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ------------------------------- Tenancy --------------------------------
+model Tenant {
+  id        String   @id @default(cuid())
+  name      String
+  type      String   @default("creator") // platform | agency | creator
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  organizations Organization[]
+  memberships   Membership[]
+  creators      Creator[]
+  ideas         Idea[]
+  scripts       Script[]
+  projects      ContentProject[]
+  tasks         Task[]
+  approvals     Approval[]
+  subscriptions Subscription[]
+  auditLogs     AuditLog[]
+  brands        Brand[]
+  opportunities Opportunity[]
+  campaigns     Campaign[]
+  contracts     Contract[]
+  invoices      Invoice[]
+  assets        Asset[]
+  complianceReviews ComplianceReview[]
+  crisisCases   CrisisCase[]
+  integrations  Integration[]
+  publishJobs   PublishJob[]
+  shootSessions ShootSession[]
+  trends        Trend[]
+  editorialItems EditorialCalendarItem[]
+  audienceQuestions AudienceQuestion[]
+  audienceListItems AudienceListItem[]
+  recommendations Recommendation[]
+}
+
+model Organization {
+  id        String   @id @default(cuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  creators Creator[]
+
+  @@index([tenantId])
+}
+
+// --------------------------- Identity & RBAC ----------------------------
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  passwordHash String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  deletedAt    DateTime?
+
+  memberships Membership[]
+  ideas       Idea[]       @relation("IdeaOwner")
+  auditLogs   AuditLog[]
+}
+
+// A user's role WITHIN a tenant (multi-tenant membership).
+model Membership {
+  id        String   @id @default(cuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  role      String   // see src/lib/rbac.ts for role keys (creator, content, writer, editor, reviewer, biz, nova_admin, nova_am, viewer ...)
+  scope     String   @default("client") // client | admin
+  createdAt DateTime @default(now())
+
+  @@unique([tenantId, userId])
+  @@index([userId])
+}
+
+// ------------------------------ Creator ---------------------------------
+model Creator {
+  id             String   @id @default(cuid())
+  tenantId       String
+  tenant         Tenant   @relation(fields: [tenantId], references: [id])
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id])
+  name           String
+  handle         String
+  niche          String?
+  bio            String?
+  toneOfVoice    String?
+  planKey        String   @default("launch") // launch | pro | star | full | agency
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  deletedAt      DateTime?
+
+  socialAccounts SocialAccount[]
+  strategies     CreatorStrategy[]
+  pillars        ContentPillar[]
+  ideas          Idea[]
+  projects       ContentProject[]
+
+  @@index([tenantId])
+}
+
+model SocialAccount {
+  id        String   @id @default(cuid())
+  tenantId  String
+  creatorId String
+  creator   Creator  @relation(fields: [creatorId], references: [id])
+  platform  String   // tiktok | instagram | youtube | snapchat | x | linkedin
+  handle    String
+  url       String?
+  status    String   @default("disconnected") // disconnected | connected | needs_reauth | expired | error | paused
+  createdAt DateTime @default(now())
+
+  @@index([creatorId])
+}
+
+// --------------------------- Strategy -----------------------------------
+model CreatorStrategy {
+  id        String   @id @default(cuid())
+  tenantId  String
+  creatorId String
+  creator   Creator  @relation(fields: [creatorId], references: [id])
+  vision    String?
+  mission   String?
+  promise   String?
+  personaJson String? // JSON: personas, swot, goals, tone
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  versions StrategyVersion[]
+
+  @@index([creatorId])
+}
+
+model StrategyVersion {
+  id         String   @id @default(cuid())
+  strategyId String
+  strategy   CreatorStrategy @relation(fields: [strategyId], references: [id])
+  version    Int
+  status     String   @default("draft") // draft | approved
+  snapshotJson String
+  createdAt  DateTime @default(now())
+
+  @@index([strategyId])
+}
+
+// ------------------------- Content Pillars ------------------------------
+model ContentPillar {
+  id        String   @id @default(cuid())
+  tenantId  String
+  creatorId String
+  creator   Creator  @relation(fields: [creatorId], references: [id])
+  name      String
+  description String?
+  targetPct Int      @default(0)
+  color     String   @default("#4f46e5")
+  kpi       String?
+  createdAt DateTime @default(now())
+
+  ideas Idea[]
+
+  @@index([creatorId])
+}
+
+// ----------------------------- Ideas ------------------------------------
+model Idea {
+  id          String   @id @default(cuid())
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  creatorId   String
+  creator     Creator  @relation(fields: [creatorId], references: [id])
+  pillarId    String?
+  pillar      ContentPillar? @relation(fields: [pillarId], references: [id])
+  title       String
+  description String?
+  status      String   @default("draft") // draft|research|proposed|approved|scripting|scheduled|production|published|postponed|rejected|archived
+  priority    String   @default("medium") // high|medium|low
+  viralScore  Int      @default(0)
+  fitScore    Int      @default(0)
+  platform    String   @default("tiktok")
+  cta         String?
+  tagsJson    String?  // JSON string[]
+  ownerId     String?
+  owner       User?    @relation("IdeaOwner", fields: [ownerId], references: [id])
+  createdBy   String?
+  updatedBy   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime?
+
+  scripts  Script[]
+  projects ContentProject[]
+
+  @@index([tenantId])
+  @@index([creatorId])
+  @@index([status])
+}
+
+// ---------------------------- Scripts -----------------------------------
+model Script {
+  id            String   @id @default(cuid())
+  tenantId      String
+  tenant        Tenant   @relation(fields: [tenantId], references: [id])
+  ideaId        String?
+  idea          Idea?    @relation(fields: [ideaId], references: [id])
+  title         String
+  hook          String?
+  intro         String?
+  body          String?  // body / talking points
+  cta           String?
+  onScreenText  String?  // النص الظاهر على الشاشة
+  description   String?  // وصف المنشور
+  hashtagsJson  String?  // JSON string[]
+  music         String?
+  wardrobe      String?
+  location      String?
+  totalDuration String?  // e.g. "٣٨ ثانية"
+  notes         String?
+  disclosure    Boolean  @default(false)
+  status        String   @default("draft") // draft | review | changes_requested | approved
+  version       Int      @default(1)
+  createdBy     String?
+  updatedBy     String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  deletedAt     DateTime?
+
+  versions ScriptVersion[]
+
+  @@index([tenantId])
+  @@index([ideaId])
+}
+
+model ScriptVersion {
+  id        String   @id @default(cuid())
+  scriptId  String
+  script    Script   @relation(fields: [scriptId], references: [id])
+  version   Int
+  contentJson String
+  createdAt DateTime @default(now())
+
+  @@index([scriptId])
+}
+
+// -------------------------- Production ----------------------------------
+model ContentProject {
+  id         String   @id @default(cuid())
+  tenantId   String
+  tenant     Tenant   @relation(fields: [tenantId], references: [id])
+  creatorId  String
+  creator    Creator  @relation(fields: [creatorId], references: [id])
+  ideaId     String?
+  idea       Idea?    @relation(fields: [ideaId], references: [id])
+  title      String
+  stageIndex Int      @default(0) // index into the 18-stage workflow
+  status     String   @default("idea")
+  ownerName  String?
+  dueDate    DateTime?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  deletedAt  DateTime?
+
+  tasks       Task[]
+  approvals   Approval[]
+  publishJobs PublishJob[]
+
+  @@index([tenantId])
+  @@index([creatorId])
+}
+
+model Task {
+  id         String   @id @default(cuid())
+  tenantId   String
+  tenant     Tenant   @relation(fields: [tenantId], references: [id])
+  projectId  String?
+  project    ContentProject? @relation(fields: [projectId], references: [id])
+  title      String
+  ownerName  String?
+  priority   String   @default("medium")
+  status     String   @default("todo") // todo | in_progress | review | done
+  dueDate    DateTime?
+  done       Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model Approval {
+  id         String   @id @default(cuid())
+  tenantId   String
+  tenant     Tenant   @relation(fields: [tenantId], references: [id])
+  projectId  String?
+  project    ContentProject? @relation(fields: [projectId], references: [id])
+  title      String
+  type       String   // content_review | script_review | edit_review | final
+  status     String   @default("pending") // pending | changes_requested | conditional | approved | rejected
+  version    String   @default("v1")
+  decidedBy  String?
+  createdAt  DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+// -------------------------- Commercial ----------------------------------
+model Plan {
+  id         String   @id @default(cuid())
+  key        String   @unique // launch | pro | star | full | agency
+  nameAr     String
+  nameEn     String
+  priceMonthly Int
+  priceAnnual  Int
+  setupFee     Int    @default(0)
+  managed      Boolean @default(false)
+  limitsJson   String  // JSON: creators, users, social, projects, storage...
+  createdAt  DateTime @default(now())
+
+  subscriptions Subscription[]
+}
+
+model Subscription {
+  id        String   @id @default(cuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  planId    String
+  plan      Plan     @relation(fields: [planId], references: [id])
+  status    String   @default("trial") // trial | active | past_due | suspended | cancelled
+  startedAt DateTime @default(now())
+  renewsAt  DateTime?
+
+  @@index([tenantId])
+}
+
+// ------------------------------ Audit -----------------------------------
+model AuditLog {
+  id        String   @id @default(cuid())
+  tenantId  String?
+  tenant    Tenant?  @relation(fields: [tenantId], references: [id])
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id])
+  action    String
+  entity    String?
+  entityId  String?
+  metaJson  String?  // never store secrets/tokens
+  createdAt DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([createdAt])
+}
+
+// ============================================================================
+// Commercial: brands → opportunities → campaigns → deliverables
+//             + contracts → obligations, invoices → payments
+// ============================================================================
+model Brand {
+  id        String   @id @default(cuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  name      String
+  sector    String?
+  status    String   @default("active")
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  contacts      BrandContact[]
+  opportunities Opportunity[]
+  campaigns     Campaign[]
+  contracts     Contract[]
+
+  @@index([tenantId])
+}
+
+model BrandContact {
+  id      String  @id @default(cuid())
+  brandId String
+  brand   Brand   @relation(fields: [brandId], references: [id])
+  name    String
+  email   String?
+  phone   String?
+  role    String?
+
+  @@index([brandId])
+}
+
+model Opportunity {
+  id         String   @id @default(cuid())
+  tenantId   String
+  tenant     Tenant   @relation(fields: [tenantId], references: [id])
+  brandId    String
+  brand      Brand    @relation(fields: [brandId], references: [id])
+  title      String
+  stage      String   @default("lead") // lead|contacted|brief|pricing|negotiation|contract|production|published|invoice|collected|rejected|cancelled
+  type       String?  // sponsorship | ugc | whitelisting | ambassador ...
+  offerValue Int?
+  dealValue  Int?
+  source     String?
+  createdBy  String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  deletedAt  DateTime?
+
+  @@index([tenantId])
+  @@index([brandId])
+}
+
+model Campaign {
+  id        String   @id @default(cuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  brandId   String
+  brand     Brand    @relation(fields: [brandId], references: [id])
+  name      String
+  status    String   @default("planning") // planning | in_production | review | live | reported | closed
+  startDate DateTime?
+  endDate   DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  deliverables Deliverable[]
+
+  @@index([tenantId])
+  @@index([brandId])
+}
+
+model Deliverable {
+  id         String   @id @default(cuid())
+  campaignId String
+  campaign   Campaign @relation(fields: [campaignId], references: [id])
+  title      String
+  platform   String   @default("tiktok")
+  dueDate    DateTime?
+  status     String   @default("todo") // todo | in_progress | delivered | approved
+  createdAt  DateTime @default(now())
+
+  @@index([campaignId])
+}
+
+model Contract {
+  id            String   @id @default(cuid())
+  tenantId      String
+  tenant        Tenant   @relation(fields: [tenantId], references: [id])
+  brandId       String?
+  brand         Brand?   @relation(fields: [brandId], references: [id])
+  type          String   // ad_collab | seasonal | ambassador | ugc ...
+  value         Int      @default(0)
+  currency      String   @default("SAR")
+  startDate     DateTime?
+  endDate       DateTime?
+  exclusivity   String?
+  usageRights   String?
+  paymentStatus String   @default("pending") // pending | partial | paid | overdue
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  deletedAt     DateTime?
+
+  obligations ContractObligation[]
+  invoices    Invoice[]
+
+  @@index([tenantId])
+  @@index([brandId])
+}
+
+// Obligations that must not be forgotten (exclusivity end, usage-rights end,
+// min-post-duration, delivery due, invoice due …) with alert dates.
+model ContractObligation {
+  id          String   @id @default(cuid())
+  contractId  String
+  contract    Contract @relation(fields: [contractId], references: [id])
+  type        String   // exclusivity_end | usage_rights_end | post_duration | delivery | invoice | payment
+  title       String
+  dueDate     DateTime?
+  status      String   @default("open") // open | done | overdue
+  createdAt   DateTime @default(now())
+
+  @@index([contractId])
+}
+
+model Invoice {
+  id         String   @id @default(cuid())
+  tenantId   String
+  tenant     Tenant   @relation(fields: [tenantId], references: [id])
+  contractId String?
+  contract   Contract? @relation(fields: [contractId], references: [id])
+  number     String
+  brandName  String?
+  amount     Int
+  currency   String   @default("SAR")
+  dueDate    DateTime?
+  status     String   @default("due") // draft | due | paid | overdue | cancelled
+  createdAt  DateTime @default(now())
+
+  payments PaymentRecord[]
+
+  @@index([tenantId])
+  @@index([contractId])
+}
+
+model PaymentRecord {
+  id        String   @id @default(cuid())
+  invoiceId String
+  invoice   Invoice  @relation(fields: [invoiceId], references: [id])
+  amount    Int
+  method    String?
+  paidAt    DateTime @default(now())
+
+  @@index([invoiceId])
+}
+
+// ============================================================================
+// Digital Asset Library
+// ============================================================================
+model Asset {
+  id          String   @id @default(cuid())
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  name        String
+  type        String   // raw_video | final_video | image | logo | music | contract | thumbnail | subtitle | template
+  folder      String   @default("عام")
+  sizeLabel   String?  // human-readable
+  sizeBytes   Int?     // real byte size (uploaded files)
+  contentType String?  // MIME type
+  storageKey  String?  // object key (never a public URL / secret)
+  uploaded    Boolean  @default(false) // true once real bytes are stored (vs. catalog/demo rows)
+  ownerName   String?
+  rightsExpiry DateTime? // license/usage-rights expiry → drives alerts
+  tagsJson    String?  // JSON string[]
+  createdBy   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime?
+
+  versions AssetVersion[]
+
+  @@index([tenantId])
+  @@index([folder])
+}
+
+model AssetVersion {
+  id        String   @id @default(cuid())
+  assetId   String
+  asset     Asset    @relation(fields: [assetId], references: [id])
+  version   Int
+  note      String?
+  createdAt DateTime @default(now())
+
+  @@index([assetId])
+}
+
+// ============================================================================
+// Compliance (KSA commercial-content). Checklist template is PLATFORM-managed
+// (editable by NovaMetrics admin, since regulations change); reviews are per-tenant.
+// Final legal review must be done by a licensed professional.
+// ============================================================================
+model ComplianceItem {
+  id        String   @id @default(cuid())
+  question  String
+  category  String?  // advertising | disclosure | rights | privacy | product | pricing
+  active    Boolean  @default(true)
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ComplianceReview {
+  id          String   @id @default(cuid())
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  subject     String   // the content under review
+  status      String   @default("pending") // pending | passed | failed
+  answersJson String   // JSON: [{ question, answer: yes|no|na, ok:boolean }]
+  reviewedBy  String?
+  notes       String?
+  createdBy   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime?
+
+  @@index([tenantId])
+}
+
+// ============================================================================
+// Reputation & Crisis. Playbooks are PLATFORM-managed templates (editable);
+// cases are per-tenant.
+// ============================================================================
+model ResponsePlaybook {
+  id                 String   @id @default(cuid())
+  key                String   @unique
+  title              String
+  scenario           String?
+  stepsJson          String?  // JSON string[]
+  approvedResponses  String?
+  forbiddenResponses String?
+  active             Boolean  @default(true)
+  createdAt          DateTime @default(now())
+
+  cases CrisisCase[]
+}
+
+model CrisisCase {
+  id                String   @id @default(cuid())
+  tenantId          String
+  tenant            Tenant   @relation(fields: [tenantId], references: [id])
+  title             String
+  severity          String   @default("medium") // low | medium | high | critical
+  source            String?
+  link              String?
+  parties           String?
+  keyMessages       String?
+  suggestedResponse String?
+  forbiddenResponse String?
+  responderName     String?
+  approvalStatus    String   @default("draft") // draft | pending | approved | published
+  status            String   @default("open")  // open | in_progress | contained | resolved | closed
+  channel           String?
+  impact            String?
+  lessons           String?
+  playbookId        String?
+  playbook          ResponsePlaybook? @relation(fields: [playbookId], references: [id])
+  createdBy         String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  deletedAt         DateTime?
+
+  @@index([tenantId])
+}
+
+// ============================================================================
+// Integration layer (Adapter Pattern). Status is a state machine.
+// SECURITY: never store raw OAuth tokens here — only a `tokenRef` pointing to a
+// secret store. Mock provider is used until real credentials exist. Never mark
+// a publish "published" unless the adapter returns a CONFIRMED success.
+// ============================================================================
+model Integration {
+  id        String   @id @default(cuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  provider  String   // tiktok | instagram | youtube | snapchat | x | linkedin
+  status    String   @default("disconnected") // disconnected|connected|needs_reauth|expired|error|paused
+  mode      String   @default("mock")         // mock | live
+  note      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  connection OAuthConnection?
+
+  @@unique([tenantId, provider])
+  @@index([tenantId])
+}
+
+model OAuthConnection {
+  id            String   @id @default(cuid())
+  integrationId String   @unique
+  integration   Integration @relation(fields: [integrationId], references: [id])
+  accountRef    String?  // external account handle/id — NOT a token
+  scopesJson    String?  // JSON string[] of granted scopes
+  tokenRef      String?  // reference to a secret-store entry; NEVER the raw token
+  expiresAt     DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model PublishJob {
+  id          String   @id @default(cuid())
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  projectId   String?
+  project     ContentProject? @relation(fields: [projectId], references: [id])
+  platform    String   @default("tiktok")
+  caption     String?
+  scheduledAt DateTime?
+  // preparing | ready | publishing | published | failed | manual
+  status      String   @default("preparing")
+  mode        String   @default("mock")   // mock | live
+  externalId  String?  // set ONLY on confirmed success
+  externalUrl String?  // manual (Phase 1) or confirmed (Phase 2)
+  error       String?
+  attempts    Int      @default(0)
+  createdBy   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([tenantId])
+  @@index([projectId])
+}
+
+// ============================================================================
+// Shoot sessions (production days) + shot list (Call Sheet source).
+// ============================================================================
+model ShootSession {
+  id        String   @id @default(cuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  name      String
+  date      DateTime?
+  location  String?
+  crewJson  String?  // JSON string[] of crew members
+  status    String   @default("draft") // draft | planned | confirmed | in_progress | done | cancelled
+  cost      Int      @default(0)
+  notes     String?
+  createdBy String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  shots Shot[]
+
+  @@index([tenantId])
+}
+
+model Shot {
+  id        String   @id @default(cuid())
+  sessionId String
+  session   ShootSession @relation(fields: [sessionId], references: [id])
+  order     Int      @default(0)
+  title     String
+  scenario  String?
+  wardrobe  String?
+  status    String   @default("todo") // todo | shot | approved | reshoot
+  notes     String?
+  createdAt DateTime @default(now())
+
+  @@index([sessionId])
+}
+
+// ============================================================================
+// Trend radar. MANUAL input + demo data only (no scraping / no unauthorized
+// data collection — see docs/tiktok-integration-plan-ar.md). Official sources
+// plug in later via the integration layer.
+// ============================================================================
+model Trend {
+  id           String   @id @default(cuid())
+  tenantId     String
+  tenant       Tenant   @relation(fields: [tenantId], references: [id])
+  name         String
+  type         String?  // sound | effect | challenge | format
+  sound        String?
+  hashtag      String?
+  refUrl       String?
+  growthScore  Int      @default(0)
+  expectedLife String?  // e.g. "قصير (٧ أيام)"
+  fit          String?  // high | medium | low
+  risk         String?  // low | medium | high
+  angle        String?  // suggested angle for this creator
+  decision     String   @default("studying") // studying | use | ignore | used
+  expiresAt    DateTime?
+  createdBy    String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  deletedAt    DateTime?
+
+  @@index([tenantId])
+}
+
+// ============================================================================
+// Editorial calendar. Manual items + "no-publish" days. The calendar VIEW also
+// aggregates derived events (shoots, project due-dates, publish jobs, campaign
+// deliverables) — those live in their own tables; this holds manual entries.
+// ============================================================================
+model EditorialCalendarItem {
+  id        String   @id @default(cuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  title     String
+  date      DateTime
+  type      String   @default("note") // publish | shoot | approval | campaign | event | trend | contract | note | no_publish
+  color     String?
+  note      String?
+  refType   String?  // optional link to another entity (e.g. "ContentProject")
+  refId     String?
+  createdBy String?
+  createdAt DateTime @default(now())
+  deletedAt DateTime?
+
+  @@index([tenantId])
+  @@index([date])
+}
+
+// ============================================================================
+// Audience & questions. Manual entry (or official integration LATER) — no
+// scraping / no unauthorized data collection.
+// ============================================================================
+model AudienceQuestion {
+  id           String   @id @default(cuid())
+  tenantId     String
+  tenant       Tenant   @relation(fields: [tenantId], references: [id])
+  text         String
+  count        Int      @default(1)
+  category     String   @default("faq") // faq | content_opportunity | potential_ad | escalation
+  status       String   @default("new") // new | answered | converted | escalated
+  source       String?
+  notes        String?
+  linkedIdeaId String?  // set when converted into an idea
+  createdBy    String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  deletedAt    DateTime?
+
+  @@index([tenantId])
+}
+
+// Approved responses + sensitive words (community guardrails).
+model AudienceListItem {
+  id        String   @id @default(cuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  kind      String   // response | sensitive
+  text      String
+  createdBy String?
+  createdAt DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+// ============================================================================
+// Smart recommendations. GENERATED from the tenant's own data (rule-based) —
+// each recommendation records the basis it was derived from. No fabricated
+// numbers or claims.
+// ============================================================================
+model Recommendation {
+  id         String   @id @default(cuid())
+  tenantId   String
+  tenant     Tenant   @relation(fields: [tenantId], references: [id])
+  key        String   // stable key to avoid duplicates on regeneration
+  text       String
+  basis      String?  // the data it was derived from
+  confidence String   @default("medium") // high | medium | low
+  category   String   @default("general")
+  status     String   @default("open") // open | applied | dismissed
+  ownerRole  String?
+  result     String?  // outcome after execution
+  createdBy  String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([tenantId, key])
+  @@index([tenantId])
+}

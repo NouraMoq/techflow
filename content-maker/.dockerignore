@@ -1,0 +1,17 @@
+node_modules
+.next
+.git
+.gitignore
+*.db
+*.db-journal
+.env
+.env.local
+.env.production
+test-results
+playwright-report
+playwright/.cache
+e2e
+prisma/dev.db*
+README.md
+DEPLOYMENT.md
+.storage

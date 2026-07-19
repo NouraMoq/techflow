@@ -1,0 +1,37 @@
+# Local/staging stack with dev↔prod parity (PostgreSQL).
+#   docker compose up --build
+# App → http://localhost:3000  (creator@example.sa / password123 when SEED_ON_START=true)
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: content_maker
+      POSTGRES_PASSWORD: change-me-in-prod
+      POSTGRES_DB: content_maker
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U content_maker -d content_maker"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    # No published port by default — the app reaches it over the compose network.
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: "postgresql://content_maker:change-me-in-prod@db:5432/content_maker"
+      AUTH_SECRET: "${AUTH_SECRET:-dev-compose-secret-change-me-please-32+chars}"
+      NODE_ENV: "production"
+      SEED_ON_START: "true"
+      PORT: "3000"
+    ports:
+      - "3000:3000"
+
+volumes:
+  pgdata:

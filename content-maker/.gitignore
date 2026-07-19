@@ -1,0 +1,16 @@
+node_modules
+.next
+out
+*.db
+*.db-journal
+.env
+.env.local
+prisma/dev.db*
+
+# E2E / Playwright
+/test-results
+/playwright-report
+/playwright/.cache
+
+# Local object storage (mock provider)
+.storage/

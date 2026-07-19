@@ -1,0 +1,71 @@
+name: Content Maker CI
+
+on:
+  push:
+    paths: ["content-maker/**", ".github/workflows/content-maker-ci.yml"]
+  pull_request:
+    paths: ["content-maker/**", ".github/workflows/content-maker-ci.yml"]
+
+defaults:
+  run:
+    working-directory: content-maker
+
+jobs:
+  # ---- Fast checks: unit tests + typecheck/build on the SQLite schema ----
+  test:
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: "file:./dev.db"
+      AUTH_SECRET: "ci-unit-secret-at-least-32-characters-long-xx"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install --legacy-peer-deps --no-audit --no-fund
+      - name: Prisma generate (sqlite)
+        run: npx prisma generate
+      - name: Unit tests (Vitest)
+        run: npm test
+      - name: Production build
+        run: npm run build
+
+  # ---- End-to-end tests against a real PostgreSQL (prod parity) ----
+  e2e:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: content_maker
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U ci -d content_maker"
+          --health-interval 5s --health-timeout 5s --health-retries 15
+    env:
+      DATABASE_URL: "postgresql://ci:ci@localhost:5432/content_maker"
+      AUTH_SECRET: "ci-e2e-secret-at-least-32-characters-long-xxxx"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install --legacy-peer-deps --no-audit --no-fund
+      - name: Switch Prisma provider to PostgreSQL
+        run: sh scripts/use-postgres.sh
+      - name: Generate client + apply committed migrations (Postgres)
+        run: |
+          npx prisma generate
+          npx prisma migrate deploy
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Run E2E (Playwright reseeds + drives the app)
+        run: npm run e2e
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: content-maker/playwright-report
+          retention-days: 7
