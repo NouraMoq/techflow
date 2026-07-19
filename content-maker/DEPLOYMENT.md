@@ -1,5 +1,9 @@
 # دليل النشر — صانع المحتوى (Content Maker)
 
+> **نشر على Google Cloud Run + Cloud SQL بنطاق فرعي منفصل عن الموقع؟** انظر الدليل المخصّص:
+> **[DEPLOY-CLOUDRUN-ar.md](DEPLOY-CLOUDRUN-ar.md)**.
+
+
 نشر إنتاجي بـ **Docker + PostgreSQL + CI**. التطوير المحلي يبقى على **SQLite** (مُتحقَّق منه)،
 ويُبدَّل مزوّد Prisma إلى **PostgreSQL** تلقائيًا عند بناء صورة Docker / في CI عبر
 `scripts/use-postgres.sh` — دون تعديل شجرة العمل المحلية. (المخطط محمول، وقد تم التحقق من
