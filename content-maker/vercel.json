@@ -1,0 +1,6 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "installCommand": "npm install --legacy-peer-deps",
+  "buildCommand": "sh scripts/use-postgres.sh && prisma generate && prisma migrate deploy && next build",
+  "framework": "nextjs"
+}
