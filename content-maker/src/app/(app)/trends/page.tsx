@@ -4,14 +4,19 @@ import { can } from "@/lib/rbac";
 import { TREND_DECISION, FIT_LABEL, RISK_LABEL, TREND_TYPE_LABEL } from "@/lib/production";
 import { dateAr } from "@/lib/commerce";
 import { IconShield } from "@/components/icons";
+import { getTopHashtags } from "@/lib/hashtags";
+import HashtagCloud from "@/components/HashtagCloud";
 import NewTrend from "./NewTrend";
 import { setTrendDecision } from "./actions";
 
 export default async function TrendsPage() {
   const s = await requireSession();
-  const trends = await prisma.trend.findMany({
-    where: { tenantId: s.tid, deletedAt: null }, orderBy: { growthScore: "desc" },
-  });
+  const [trends, topTags] = await Promise.all([
+    prisma.trend.findMany({
+      where: { tenantId: s.tid, deletedAt: null }, orderBy: { growthScore: "desc" },
+    }),
+    getTopHashtags(s.tid, 20),
+  ]);
   const mayManage = can(s.role, "trend.manage");
 
   return (
@@ -24,6 +29,14 @@ export default async function TrendsPage() {
       <div className="callout info" style={{ marginBottom: 16 }}>
         <IconShield />
         <div><b>التزام</b><p>لا Web Scraping مخالف لشروط المنصات. المصادر الرسمية تُضاف مستقبلًا عبر طبقة التكامل.</p></div>
+      </div>
+
+      <div className="card card-pad" style={{ marginBottom: 16 }}>
+        <div className="row between" style={{ marginBottom: 10 }}>
+          <b style={{ fontSize: 15 }}>أبرز الهاشتاقات المرتبطة بمحتواك</b>
+          <span className="faint" style={{ fontSize: 12 }}>مشتقّة من ترنداتك وسيناريوهاتك وأفكارك · انقر للنسخ</span>
+        </div>
+        <HashtagCloud items={topTags} />
       </div>
 
       <div className="grid g-2">

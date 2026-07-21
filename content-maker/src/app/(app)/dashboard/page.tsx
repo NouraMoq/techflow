@@ -2,12 +2,14 @@ import { requireSession } from "@/lib/session";
 import { prisma } from "@/lib/db";
 import { WORKFLOW_STAGES } from "@/lib/constants";
 import { IconBulb, IconWorkflow, IconCheck, IconChart } from "@/components/icons";
+import { getTopHashtags } from "@/lib/hashtags";
+import HashtagCloud from "@/components/HashtagCloud";
 
 export default async function DashboardPage() {
   const s = await requireSession();
   const tenantId = s.tid; // tenant isolation boundary
 
-  const [ideaCount, projCount, pendingApprovals, projects, creator] = await Promise.all([
+  const [ideaCount, projCount, pendingApprovals, projects, creator, topTags] = await Promise.all([
     prisma.idea.count({ where: { tenantId, deletedAt: null } }),
     prisma.contentProject.count({ where: { tenantId, status: "production", deletedAt: null } }),
     prisma.approval.count({ where: { tenantId, status: "pending" } }),
@@ -15,6 +17,7 @@ export default async function DashboardPage() {
       where: { tenantId, deletedAt: null }, orderBy: { dueDate: "asc" }, take: 5,
     }),
     prisma.creator.findFirst({ where: { tenantId, deletedAt: null } }),
+    getTopHashtags(tenantId, 10),
   ]);
 
   const stats = [
@@ -42,6 +45,16 @@ export default async function DashboardPage() {
           </div>
         ))}
       </div>
+
+      {topTags.length > 0 && (
+        <div className="card card-pad" style={{ marginBottom: 16 }}>
+          <div className="row between" style={{ marginBottom: 10 }}>
+            <b style={{ fontSize: 15 }}>أبرز الهاشتاقات</b>
+            <span className="faint" style={{ fontSize: 12 }}>الأكثر ارتباطًا بمحتواك · انقر للنسخ</span>
+          </div>
+          <HashtagCloud items={topTags} compact />
+        </div>
+      )}
 
       <div className="card">
         <div className="card-head"><h3>الإنتاج القادم</h3><span className="sub">أقرب المشاريع حسب الاستحقاق</span></div>
