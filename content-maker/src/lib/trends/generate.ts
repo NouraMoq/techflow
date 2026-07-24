@@ -2,7 +2,7 @@ import "server-only";
 import { prisma } from "@/lib/db";
 import { parseArr } from "@/lib/json";
 import { loadClientContext } from "./context";
-import { defaultGenerator } from "./analysis/generator";
+import { analysisGenerator } from "./analysis/factory";
 import type { ContentDraft, GenTopic, Sentiment } from "./types";
 
 /** Generate several ready content briefs from an analyzed Trend. */
@@ -22,6 +22,6 @@ export async function generateFromTrend(
     angle: t.angle ?? undefined,
   };
   const client = await loadClientContext(tenantId);
-  const drafts = await defaultGenerator.generate(topic, client);
+  const drafts = await analysisGenerator.generate(topic, client);
   return { topicName: t.name, drafts };
 }

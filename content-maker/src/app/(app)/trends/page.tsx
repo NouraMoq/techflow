@@ -9,6 +9,7 @@ import HashtagCloud from "@/components/HashtagCloud";
 import { learnWinningTrends } from "@/lib/trends/learning";
 import { trendPerformanceRanking, trendContentForPerformance } from "@/lib/trends/performance";
 import { TREND_STATUS_LABEL, SENTIMENT_LABEL, COMPETITION_LABEL, TREND_SOURCE_LABEL } from "@/lib/trends/labels";
+import { aiEnabled } from "@/lib/trends/analysis/factory";
 import NewTrend from "./NewTrend";
 import DiscoverPanel from "./DiscoverPanel";
 import { setTrendDecision, detectOpportunitiesAction, convertOpportunityToIdea, recordPerformanceAction } from "./actions";
@@ -50,7 +51,16 @@ export default async function TrendsPage({ searchParams }: { searchParams: { tab
   return (
     <>
       <div className="page-head">
-        <div><h1>رادار الترندات</h1><p>محرك ذكاء ترندات: اكتشف الموضوعات الرائجة، حلّلها، وحوّلها إلى محتوى — دون أي جمع غير مصرّح به.</p></div>
+        <div>
+          <h1 style={{ display: "inline-flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+            رادار الترندات
+            <span className={`badge ${aiEnabled() ? "b-green" : "b-slate"}`} style={{ fontSize: 11, fontWeight: 600 }}
+              title={aiEnabled() ? "التحليل يتم عبر نموذج ذكاء اصطناعي" : "التحليل يعمل بالقواعد — فعّل ANTHROPIC_API_KEY لتشغيل الذكاء الاصطناعي"}>
+              {aiEnabled() ? "المحرك: ذكاء اصطناعي" : "المحرك: قواعد"}
+            </span>
+          </h1>
+          <p>محرك ذكاء ترندات: اكتشف الموضوعات الرائجة، حلّلها، وحوّلها إلى محتوى — دون أي جمع غير مصرّح به.</p>
+        </div>
         {mayManage && tab === "analyze" && <div className="actions"><NewTrend /></div>}
       </div>
 

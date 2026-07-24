@@ -74,3 +74,4 @@ node_modules/
 
 # Claude Code local tooling/config (contains local settings)
 .claude/
+content-maker/tsconfig.tsbuildinfo
