@@ -5,9 +5,10 @@ import { MockProvider } from "./providers/mock";
 import { CsvProvider } from "./providers/csv";
 import { JsonProvider } from "./providers/json";
 import {
-  GoogleTrendsProvider, CreativeCenterProvider, OfficialTikTokProvider, LicensedProvider,
-  googleTrendsConfigured, creativeCenterConfigured, officialTikTokConfigured, licensedConfigured,
+  GoogleTrendsProvider, CreativeCenterProvider, OfficialTikTokProvider,
+  googleTrendsConfigured, creativeCenterConfigured, officialTikTokConfigured,
 } from "./providers/gated";
+import { ExternalLicensedProvider, licensedConfigured } from "./providers/licensed";
 
 /** Factory — the rest of the system asks for a source, never for a concrete class. */
 export function getTrendProvider(source: TrendSource): TrendDataProvider {
@@ -19,7 +20,7 @@ export function getTrendProvider(source: TrendSource): TrendDataProvider {
     case "google_trends": return new GoogleTrendsProvider();
     case "creative_center": return new CreativeCenterProvider();
     case "official_tiktok": return new OfficialTikTokProvider();
-    case "licensed": return new LicensedProvider();
+    case "licensed": return new ExternalLicensedProvider();
     default: return new ManualProvider();
   }
 }
@@ -44,5 +45,5 @@ export const TREND_SOURCES: { key: TrendSource; label: string; planned: boolean;
   { key: "google_trends", label: "Google Trends", planned: true, kind: "live" },
   { key: "creative_center", label: "TikTok Creative Center", planned: true, kind: "live" },
   { key: "official_tiktok", label: "TikTok الرسمي", planned: true, kind: "live" },
-  { key: "licensed", label: "مزوّد مرخّص", planned: true, kind: "live" },
+  { key: "licensed", label: "مزوّد مرخّص (API)", planned: true, kind: "live" },
 ];

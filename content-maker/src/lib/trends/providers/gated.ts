@@ -18,6 +18,10 @@ abstract class GatedProvider implements TrendDataProvider {
   }
 }
 
+// Google Trends: kept ONLY as a future integration. Google exposes no general
+// official public API today; a limited-access official API exists in Alpha. Do
+// not depend on it in the current version — this stays gated/NotConfigured.
+// (The licensed provider is the compliant path today — see providers/licensed.ts.)
 export class GoogleTrendsProvider extends GatedProvider {
   readonly source = "google_trends" as const;
   protected configured() { return googleTrendsConfigured(); }
@@ -30,13 +34,8 @@ export class OfficialTikTokProvider extends GatedProvider {
   readonly source = "official_tiktok" as const;
   protected configured() { return officialTikTokConfigured(); }
 }
-export class LicensedProvider extends GatedProvider {
-  readonly source = "licensed" as const;
-  protected configured() { return licensedConfigured(); }
-}
 
 export const googleTrendsConfigured = () => Boolean(process.env.GOOGLE_TRENDS_API_KEY);
 export const creativeCenterConfigured = () => Boolean(process.env.TIKTOK_CREATIVE_CENTER_TOKEN);
 export const officialTikTokConfigured = () =>
   Boolean(process.env.TIKTOK_CLIENT_KEY && process.env.TIKTOK_CLIENT_SECRET);
-export const licensedConfigured = () => Boolean(process.env.TREND_LICENSED_API_KEY);
