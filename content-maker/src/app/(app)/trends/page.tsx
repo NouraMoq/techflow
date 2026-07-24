@@ -6,6 +6,7 @@ import { TREND_DECISION, FIT_LABEL, RISK_LABEL } from "@/lib/production";
 import { IconShield } from "@/components/icons";
 import { getTopHashtags } from "@/lib/hashtags";
 import HashtagCloud from "@/components/HashtagCloud";
+import { learnWinningTrends } from "@/lib/trends/learning";
 import { TREND_STATUS_LABEL, SENTIMENT_LABEL, COMPETITION_LABEL, TREND_SOURCE_LABEL } from "@/lib/trends/labels";
 import NewTrend from "./NewTrend";
 import DiscoverPanel from "./DiscoverPanel";
@@ -24,11 +25,12 @@ const OPP_KIND: Record<string, { label: string; cls: string }> = {
 export default async function TrendsPage({ searchParams }: { searchParams: { tab?: string } }) {
   const s = await requireSession();
   const tab: Tab = (["discover", "analyze", "create"].includes(searchParams.tab ?? "") ? searchParams.tab : "analyze") as Tab;
-  const [trends, topTags, signalCount, opportunities] = await Promise.all([
+  const [trends, topTags, signalCount, opportunities, winning] = await Promise.all([
     prisma.trend.findMany({ where: { tenantId: s.tid, deletedAt: null }, orderBy: [{ growthScore: "desc" }] }),
     getTopHashtags(s.tid, 20),
     prisma.trendSignal.count({ where: { tenantId: s.tid } }),
     prisma.trendOpportunity.findMany({ where: { tenantId: s.tid, deletedAt: null }, orderBy: [{ score: "desc" }] }),
+    learnWinningTrends(s.tid),
   ]);
   const mayManage = can(s.role, "trend.manage");
   const mayIdea = can(s.role, "idea.create");
@@ -67,6 +69,16 @@ export default async function TrendsPage({ searchParams }: { searchParams: { tab
 
       {tab === "analyze" && (
         <>
+          {winning.hasSignal && (
+            <div className="card card-pad" style={{ marginBottom: 16, borderInlineStart: "3px solid var(--primary)" }}>
+              <div className="row between" style={{ marginBottom: 6 }}>
+                <b style={{ fontSize: 15 }}>ما ينجح معك</b>
+                <span className="badge b-primary">تعلّم من أدائك</span>
+              </div>
+              <p style={{ fontSize: 13.5, marginBottom: 6 }}>{winning.text}</p>
+              <p className="faint" style={{ fontSize: 12 }}>{winning.basis.join(" · ")}</p>
+            </div>
+          )}
           <div className="card card-pad" style={{ marginBottom: 16 }}>
             <div className="row between" style={{ marginBottom: 10 }}>
               <b style={{ fontSize: 15 }}>أبرز الهاشتاقات المرتبطة بمحتواك</b>

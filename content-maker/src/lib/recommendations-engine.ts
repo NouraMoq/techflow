@@ -1,5 +1,6 @@
 import "server-only";
 import { prisma } from "./db";
+import { learnWinningTrends } from "./trends/learning";
 
 // ============================================================================
 // Rule-based recommendation engine. Every recommendation is DERIVED from the
@@ -95,6 +96,17 @@ export async function generateRecommendations(tenantId: string): Promise<Generat
       key: "publish_volume", category: "growth", confidence: "low", ownerRole: "content",
       text: "ارفع وتيرة النشر — عدد المنشورات المؤكَّدة هذا الشهر منخفض.",
       basis: `${publishedJobs} منشور مؤكَّد فقط`,
+    });
+  }
+
+  // 8) Winning trend types — learned from actioned trends + their ideas' progress
+  const winning = await learnWinningTrends(tenantId);
+  if (winning.hasSignal && winning.text) {
+    recs.push({
+      key: "winning_trends", category: "trend",
+      confidence: winning.progressed ? "medium" : "low", ownerRole: "content",
+      text: winning.text,
+      basis: winning.basis.join(" · "),
     });
   }
 
