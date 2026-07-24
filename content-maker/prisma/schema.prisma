@@ -50,6 +50,7 @@ model Tenant {
   trends        Trend[]
   trendSignals  TrendSignal[]
   trendOpportunities TrendOpportunity[]
+  contentPerformances ContentPerformance[]
   editorialItems EditorialCalendarItem[]
   audienceQuestions AudienceQuestion[]
   audienceListItems AudienceListItem[]
@@ -218,6 +219,7 @@ model Idea {
 
   scripts  Script[]
   projects ContentProject[]
+  performances ContentPerformance[]
 
   @@index([tenantId])
   @@index([creatorId])
@@ -853,6 +855,32 @@ model TrendOpportunity {
 
   @@unique([tenantId, key])
   @@index([tenantId])
+}
+
+// Level 5: performance of a PUBLISHED piece — entered manually or imported
+// (no scraping). Linked to the Idea and denormalized to its source Trend so the
+// engine can measure "which trends actually performed".
+model ContentPerformance {
+  id            String   @id @default(cuid())
+  tenantId      String
+  tenant        Tenant   @relation(fields: [tenantId], references: [id])
+  ideaId        String
+  idea          Idea     @relation(fields: [ideaId], references: [id])
+  sourceTrendId String?  // denormalized from the idea for easy aggregation
+  source        String   @default("manual") // manual | csv | json | api
+  views         Int      @default(0)
+  likes         Int      @default(0)
+  shares        Int      @default(0)
+  comments      Int      @default(0)
+  saves         Int      @default(0)
+  publishedUrl  String?
+  measuredAt    DateTime @default(now())
+  createdBy     String?
+  createdAt     DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([ideaId])
+  @@index([sourceTrendId])
 }
 
 // ============================================================================

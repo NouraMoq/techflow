@@ -6,6 +6,7 @@ import { prisma } from "@/lib/db";
 import { requireSession, assertCan } from "@/lib/session";
 import { analyzeFromSource } from "@/lib/trends/analyze";
 import { detectOpportunities } from "@/lib/trends/opportunity";
+import { recordPerformance } from "@/lib/trends/performance";
 import { TrendSourceNotConfiguredError, type TrendSource } from "@/lib/trends/types";
 
 export type TrendState = { error?: string; ok?: boolean };
@@ -228,4 +229,20 @@ export async function createIdeaAndScriptFromDraft(formData: FormData): Promise<
   await prisma.auditLog.create({ data: { tenantId: s.tid, userId: s.uid, action: "trend.generate.script", entity: "Script", entityId: script.id, metaJson: JSON.stringify({ ideaId: idea.id, trendId: d.trendId }) } });
   revalidatePath("/ideas"); revalidatePath("/scripts");
   redirect(`/scripts/${script.id}`);
+}
+
+// ---- Level 5: record published performance (manual entry — no scraping) ----
+export async function recordPerformanceAction(formData: FormData): Promise<void> {
+  const s = await requireSession();
+  try { assertCan(s, "analytics.view"); } catch { return; }
+  const ideaId = String(formData.get("ideaId") ?? "");
+  if (!ideaId) return;
+  const num = (k: string) => Math.max(0, Math.floor(Number(String(formData.get(k) ?? "0").replace(/[^\d]/g, "")) || 0));
+  const ok = await recordPerformance(s.tid, ideaId, {
+    views: num("views"), likes: num("likes"), shares: num("shares"), comments: num("comments"), saves: num("saves"),
+  }, s.uid);
+  if (ok) {
+    await prisma.auditLog.create({ data: { tenantId: s.tid, userId: s.uid, action: "trend.performance.record", entity: "Idea", entityId: ideaId } });
+    revalidatePath("/trends");
+  }
 }

@@ -1,6 +1,7 @@
 import "server-only";
 import { prisma } from "@/lib/db";
 import { SENTIMENT_LABEL } from "./labels";
+import { trendPerformanceRanking } from "./performance";
 
 // How far a resulting idea progressed = success proxy (until real publish analytics exist).
 const PROGRESS: Record<string, number> = {
@@ -30,7 +31,36 @@ const EMPTY: WinningInsight = {
  * data: trends that were actioned (Idea.sourceTrendId) and how far their ideas
  * progressed. Gated on a minimum sample — never fabricates a pattern.
  */
+// Preferred signal: REAL published performance (closes the loop).
+async function performanceInsight(tenantId: string): Promise<WinningInsight | null> {
+  const rows = await trendPerformanceRanking(tenantId);
+  if (rows.length < 2) return null;
+  const avg = rows.reduce((s, r) => s + r.avgEngagementPct, 0) / rows.length;
+  const top = rows.filter((r) => r.avgEngagementPct >= avg);
+  const bySent: Record<string, { count: number; eng: number }> = {};
+  for (const r of top) {
+    const s = r.sentiment ?? "neutral";
+    bySent[s] = bySent[s] ?? { count: 0, eng: 0 };
+    bySent[s].count++; bySent[s].eng += r.avgEngagementPct;
+  }
+  const topValue = Object.entries(bySent).sort((a, b) => b[1].count - a[1].count || b[1].eng - a[1].eng)[0][0];
+  const best = rows[0];
+  return {
+    hasSignal: true, actedCount: rows.length, wonCount: top.length, topValue,
+    topLabel: SENTIMENT_LABEL[topValue] ?? topValue, progressed: true,
+    basis: [
+      `${rows.length} ترند لديه بيانات أداء منشورة`,
+      `أعلى أداءً: «${best.name}» بمتوسط تفاعل ${best.avgEngagementPct}٪`,
+      `النبرة الغالبة في الأعلى أداءً: ${SENTIMENT_LABEL[topValue] ?? topValue}`,
+    ],
+    text: `بناءً على الأداء الفعلي: ترنداتك ذات النبرة «${SENTIMENT_LABEL[topValue] ?? topValue}» تحقق أفضل تفاعل. أعطِ الأولوية للترندات المشابهة.`,
+  };
+}
+
 export async function learnWinningTrends(tenantId: string): Promise<WinningInsight> {
+  const perf = await performanceInsight(tenantId);
+  if (perf) return perf; // real performance beats the idea-progress proxy
+
   const ideas = await prisma.idea.findMany({
     where: { tenantId, deletedAt: null, sourceTrendId: { not: null } },
     select: { sourceTrendId: true, status: true },

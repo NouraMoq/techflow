@@ -7,14 +7,17 @@ import { IconShield } from "@/components/icons";
 import { getTopHashtags } from "@/lib/hashtags";
 import HashtagCloud from "@/components/HashtagCloud";
 import { learnWinningTrends } from "@/lib/trends/learning";
+import { trendPerformanceRanking, trendContentForPerformance } from "@/lib/trends/performance";
 import { TREND_STATUS_LABEL, SENTIMENT_LABEL, COMPETITION_LABEL, TREND_SOURCE_LABEL } from "@/lib/trends/labels";
 import NewTrend from "./NewTrend";
 import DiscoverPanel from "./DiscoverPanel";
-import { setTrendDecision, detectOpportunitiesAction, convertOpportunityToIdea } from "./actions";
+import { setTrendDecision, detectOpportunitiesAction, convertOpportunityToIdea, recordPerformanceAction } from "./actions";
 
-type Tab = "discover" | "analyze" | "create";
+type Tab = "discover" | "analyze" | "create" | "performance";
 type Trend = Awaited<ReturnType<typeof prisma.trend.findMany>>[number];
 type Opp = Awaited<ReturnType<typeof prisma.trendOpportunity.findMany>>[number];
+type PerfContent = Awaited<ReturnType<typeof trendContentForPerformance>>[number];
+const IDEA_STATUS_AR: Record<string, string> = { scripting: "كتابة السيناريو", scheduled: "مجدولة", production: "قيد الإنتاج", published: "منشورة" };
 
 const OPP_KIND: Record<string, { label: string; cls: string }> = {
   from_trend: { label: "من ترند", cls: "b-primary" },
@@ -24,14 +27,17 @@ const OPP_KIND: Record<string, { label: string; cls: string }> = {
 
 export default async function TrendsPage({ searchParams }: { searchParams: { tab?: string } }) {
   const s = await requireSession();
-  const tab: Tab = (["discover", "analyze", "create"].includes(searchParams.tab ?? "") ? searchParams.tab : "analyze") as Tab;
-  const [trends, topTags, signalCount, opportunities, winning] = await Promise.all([
+  const tab: Tab = (["discover", "analyze", "create", "performance"].includes(searchParams.tab ?? "") ? searchParams.tab : "analyze") as Tab;
+  const [trends, topTags, signalCount, opportunities, winning, perfRanking, perfContent] = await Promise.all([
     prisma.trend.findMany({ where: { tenantId: s.tid, deletedAt: null }, orderBy: [{ growthScore: "desc" }] }),
     getTopHashtags(s.tid, 20),
     prisma.trendSignal.count({ where: { tenantId: s.tid } }),
     prisma.trendOpportunity.findMany({ where: { tenantId: s.tid, deletedAt: null }, orderBy: [{ score: "desc" }] }),
     learnWinningTrends(s.tid),
+    trendPerformanceRanking(s.tid),
+    trendContentForPerformance(s.tid),
   ]);
+  const mayPerf = can(s.role, "analytics.view");
   const mayManage = can(s.role, "trend.manage");
   const mayIdea = can(s.role, "idea.create");
   const openOpps = opportunities.filter((o) => o.status === "open");
@@ -52,6 +58,7 @@ export default async function TrendsPage({ searchParams }: { searchParams: { tab
         <TabLink id="discover" label="① اكتشف" />
         <TabLink id="analyze" label="② حلّل" />
         <TabLink id="create" label="③ اصنع محتوى" />
+        <TabLink id="performance" label="④ الأداء" />
       </div>
 
       {tab === "discover" && (
@@ -117,7 +124,63 @@ export default async function TrendsPage({ searchParams }: { searchParams: { tab
           </div>
         </>
       )}
+
+      {tab === "performance" && (
+        <>
+          <div className="card card-pad" style={{ marginBottom: 16 }}>
+            <b style={{ fontSize: 15 }}>أفضل الترندات أداءً</b>
+            <p className="faint" style={{ fontSize: 12.5, margin: "4px 0 10px" }}>مرتّبة حسب متوسط التفاعل الفعلي للمحتوى المنشور المشتق منها — هذه الحلقة تُغذّي «ما ينجح معك» والتوصيات.</p>
+            {perfRanking.length ? (
+              <div className="tbl-wrap">
+                <table className="tbl">
+                  <thead><tr><th>الترند</th><th>محتوى</th><th>مشاهدات</th><th>متوسط التفاعل</th></tr></thead>
+                  <tbody>
+                    {perfRanking.map((r, i) => (
+                      <tr key={r.trendId}>
+                        <td><Link href={`/trends/${r.trendId}`}><b>{i + 1}. {r.name}</b></Link>{r.sentiment && <span className="badge b-slate" style={{ fontSize: 10, marginInlineStart: 6 }}>{SENTIMENT_LABEL[r.sentiment] ?? r.sentiment}</span>}</td>
+                        <td>{r.contentCount}</td>
+                        <td>{r.totalViews.toLocaleString("en")}</td>
+                        <td><b>{r.avgEngagementPct}٪</b></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : <p className="faint" style={{ fontSize: 13 }}>لا بيانات أداء بعد — سجّل أداء محتوى منشور أدناه لتظهر هنا.</p>}
+          </div>
+
+          <div className="card card-pad">
+            <b style={{ fontSize: 15 }}>سجّل أداء محتواك المشتق من الترندات</b>
+            <p className="faint" style={{ fontSize: 12.5, margin: "4px 0 6px" }}>أدخل الأرقام يدويًا — لا جمع تلقائي غير مصرّح به. (الاستيراد الرسمي عبر واجهة المنصة لاحقًا.)</p>
+            {perfContent.length
+              ? perfContent.map((c) => <PerfRow key={c.id} c={c} mayPerf={mayPerf} />)
+              : <p className="faint" style={{ fontSize: 13 }}>لا محتوى مشتق من الترندات وصل لمرحلة الإنتاج/النشر بعد.</p>}
+          </div>
+        </>
+      )}
     </>
+  );
+}
+
+function PerfRow({ c, mayPerf }: { c: PerfContent; mayPerf: boolean }) {
+  return (
+    <div style={{ borderTop: "1px solid var(--border,#eee)", padding: "10px 0" }}>
+      <div className="row between" style={{ marginBottom: 6, gap: 8 }}>
+        <b style={{ fontSize: 13.5 }}>{c.title}</b>
+        <span className="badge b-slate" style={{ fontSize: 10, whiteSpace: "nowrap" }}>{IDEA_STATUS_AR[c.status] ?? c.status} · {c._count.performances} قياس</span>
+      </div>
+      {mayPerf ? (
+        <form action={recordPerformanceAction} className="row wrap" style={{ gap: 6, alignItems: "center" }}>
+          <input type="hidden" name="ideaId" value={c.id} />
+          <input name="views" inputMode="numeric" placeholder="مشاهدات" style={{ width: 92, fontSize: 12 }} />
+          <input name="likes" inputMode="numeric" placeholder="إعجابات" style={{ width: 82, fontSize: 12 }} />
+          <input name="shares" inputMode="numeric" placeholder="مشاركات" style={{ width: 82, fontSize: 12 }} />
+          <input name="comments" inputMode="numeric" placeholder="تعليقات" style={{ width: 82, fontSize: 12 }} />
+          <input name="saves" inputMode="numeric" placeholder="حفظ" style={{ width: 66, fontSize: 12 }} />
+          <button className="btn btn-soft" style={{ fontSize: 12, padding: "5px 12px" }}>سجّل</button>
+        </form>
+      ) : <span className="faint" style={{ fontSize: 12 }}>تحتاج صلاحية التحليلات.</span>}
+    </div>
   );
 }
 

@@ -692,6 +692,26 @@ CREATE TABLE "TrendOpportunity" (
 );
 
 -- CreateTable
+CREATE TABLE "ContentPerformance" (
+    "id" TEXT NOT NULL,
+    "tenantId" TEXT NOT NULL,
+    "ideaId" TEXT NOT NULL,
+    "sourceTrendId" TEXT,
+    "source" TEXT NOT NULL DEFAULT 'manual',
+    "views" INTEGER NOT NULL DEFAULT 0,
+    "likes" INTEGER NOT NULL DEFAULT 0,
+    "shares" INTEGER NOT NULL DEFAULT 0,
+    "comments" INTEGER NOT NULL DEFAULT 0,
+    "saves" INTEGER NOT NULL DEFAULT 0,
+    "publishedUrl" TEXT,
+    "measuredAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "createdBy" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "ContentPerformance_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "EditorialCalendarItem" (
     "id" TEXT NOT NULL,
     "tenantId" TEXT NOT NULL,
@@ -922,6 +942,15 @@ CREATE INDEX "TrendOpportunity_tenantId_idx" ON "TrendOpportunity"("tenantId");
 CREATE UNIQUE INDEX "TrendOpportunity_tenantId_key_key" ON "TrendOpportunity"("tenantId", "key");
 
 -- CreateIndex
+CREATE INDEX "ContentPerformance_tenantId_idx" ON "ContentPerformance"("tenantId");
+
+-- CreateIndex
+CREATE INDEX "ContentPerformance_ideaId_idx" ON "ContentPerformance"("ideaId");
+
+-- CreateIndex
+CREATE INDEX "ContentPerformance_sourceTrendId_idx" ON "ContentPerformance"("sourceTrendId");
+
+-- CreateIndex
 CREATE INDEX "EditorialCalendarItem_tenantId_idx" ON "EditorialCalendarItem"("tenantId");
 
 -- CreateIndex
@@ -1103,6 +1132,12 @@ ALTER TABLE "TrendSignal" ADD CONSTRAINT "TrendSignal_clusterTrendId_fkey" FOREI
 
 -- AddForeignKey
 ALTER TABLE "TrendOpportunity" ADD CONSTRAINT "TrendOpportunity_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "ContentPerformance" ADD CONSTRAINT "ContentPerformance_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "ContentPerformance" ADD CONSTRAINT "ContentPerformance_ideaId_fkey" FOREIGN KEY ("ideaId") REFERENCES "Idea"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "EditorialCalendarItem" ADD CONSTRAINT "EditorialCalendarItem_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
