@@ -48,6 +48,7 @@ model Tenant {
   publishJobs   PublishJob[]
   shootSessions ShootSession[]
   trends        Trend[]
+  trendSignals  TrendSignal[]
   editorialItems EditorialCalendarItem[]
   audienceQuestions AudienceQuestion[]
   audienceListItems AudienceListItem[]
@@ -204,6 +205,7 @@ model Idea {
   platform    String   @default("tiktok")
   cta         String?
   tagsJson    String?  // JSON string[]
+  sourceTrendId String? // optional link back to the source Trend (Trend Intelligence)
   ownerId     String?
   owner       User?    @relation("IdeaOwner", fields: [ownerId], references: [id])
   createdBy   String?
@@ -774,7 +776,55 @@ model Trend {
   updatedAt    DateTime @updatedAt
   deletedAt    DateTime?
 
+  // --- Trend Intelligence (Phase 1) — a Trend is the clustered TOPIC ---
+  source            String?  // TrendSource: manual | mock | csv | json | ...
+  status            String   @default("new") // new | analyzed | actioned
+  summary           String?
+  story             String?
+  whyTrending       String?
+  sentiment         String?  // positive | neutral | negative | mixed
+  competition       String?  // low | medium | high
+  signalCount       Int      @default(0)
+  firstSeenAt       DateTime?
+  lastSeenAt        DateTime?
+  clientScore       Int?     // 0..100 fit for this tenant's creator
+  scoreBasisJson    String?  // JSON string[] — human-readable basis (like recommendations)
+  keywordsJson      String?  // JSON string[]
+  subtopicsJson     String?  // JSON string[]
+  questionsJson     String?  // JSON string[]
+  countriesJson     String?  // JSON string[]
+  nichesJson        String?  // JSON string[]
+  hooksJson         String?  // JSON string[]
+  risksJson         String?  // JSON string[]
+  opportunitiesJson String?  // JSON string[]
+
+  signals TrendSignal[]
+
   @@index([tenantId])
+}
+
+// Raw ingested signal (a single video/post/query). Clustered into a Trend topic.
+// Providers return these; nothing else knows where the data came from.
+model TrendSignal {
+  id             String   @id @default(cuid())
+  tenantId       String
+  tenant         Tenant   @relation(fields: [tenantId], references: [id])
+  source         String   // TrendSource
+  externalRef    String?  // provider-supplied id/url (public), never a secret
+  text           String
+  hashtagsJson   String?  // JSON string[]
+  keywordsJson   String?  // JSON string[] (filled by extract stage)
+  lang           String?
+  metricsJson    String?  // JSON: { views?, likes?, shares?, accounts?, postedAt? }
+  topic          String?  // filled by extract stage
+  sentiment      String?  // filled by extract stage
+  clusterTrendId String?  // set by cluster stage
+  clusterTrend   Trend?   @relation(fields: [clusterTrendId], references: [id])
+  createdBy      String?
+  createdAt      DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([clusterTrendId])
 }
 
 // ============================================================================

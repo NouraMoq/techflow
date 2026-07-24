@@ -136,6 +136,7 @@ CREATE TABLE "Idea" (
     "platform" TEXT NOT NULL DEFAULT 'tiktok',
     "cta" TEXT,
     "tagsJson" TEXT,
+    "sourceTrendId" TEXT,
     "ownerId" TEXT,
     "createdBy" TEXT,
     "updatedBy" TEXT,
@@ -622,8 +623,48 @@ CREATE TABLE "Trend" (
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
     "deletedAt" TIMESTAMP(3),
+    "source" TEXT,
+    "status" TEXT NOT NULL DEFAULT 'new',
+    "summary" TEXT,
+    "story" TEXT,
+    "whyTrending" TEXT,
+    "sentiment" TEXT,
+    "competition" TEXT,
+    "signalCount" INTEGER NOT NULL DEFAULT 0,
+    "firstSeenAt" TIMESTAMP(3),
+    "lastSeenAt" TIMESTAMP(3),
+    "clientScore" INTEGER,
+    "scoreBasisJson" TEXT,
+    "keywordsJson" TEXT,
+    "subtopicsJson" TEXT,
+    "questionsJson" TEXT,
+    "countriesJson" TEXT,
+    "nichesJson" TEXT,
+    "hooksJson" TEXT,
+    "risksJson" TEXT,
+    "opportunitiesJson" TEXT,
 
     CONSTRAINT "Trend_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "TrendSignal" (
+    "id" TEXT NOT NULL,
+    "tenantId" TEXT NOT NULL,
+    "source" TEXT NOT NULL,
+    "externalRef" TEXT,
+    "text" TEXT NOT NULL,
+    "hashtagsJson" TEXT,
+    "keywordsJson" TEXT,
+    "lang" TEXT,
+    "metricsJson" TEXT,
+    "topic" TEXT,
+    "sentiment" TEXT,
+    "clusterTrendId" TEXT,
+    "createdBy" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "TrendSignal_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -845,6 +886,12 @@ CREATE INDEX "Shot_sessionId_idx" ON "Shot"("sessionId");
 CREATE INDEX "Trend_tenantId_idx" ON "Trend"("tenantId");
 
 -- CreateIndex
+CREATE INDEX "TrendSignal_tenantId_idx" ON "TrendSignal"("tenantId");
+
+-- CreateIndex
+CREATE INDEX "TrendSignal_clusterTrendId_idx" ON "TrendSignal"("clusterTrendId");
+
+-- CreateIndex
 CREATE INDEX "EditorialCalendarItem_tenantId_idx" ON "EditorialCalendarItem"("tenantId");
 
 -- CreateIndex
@@ -1017,6 +1064,12 @@ ALTER TABLE "Shot" ADD CONSTRAINT "Shot_sessionId_fkey" FOREIGN KEY ("sessionId"
 
 -- AddForeignKey
 ALTER TABLE "Trend" ADD CONSTRAINT "Trend_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "TrendSignal" ADD CONSTRAINT "TrendSignal_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "TrendSignal" ADD CONSTRAINT "TrendSignal_clusterTrendId_fkey" FOREIGN KEY ("clusterTrendId") REFERENCES "Trend"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "EditorialCalendarItem" ADD CONSTRAINT "EditorialCalendarItem_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
