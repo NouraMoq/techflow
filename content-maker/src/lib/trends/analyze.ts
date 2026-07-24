@@ -61,6 +61,7 @@ function persistTopic(tenantId: string, source: TrendSource, t: TopicDraft, crea
       lastSeenAt: last,
       firstSeenAt: last,
       clientScore: t.clientScore ?? null,
+      confidenceScore: t.confidence ?? null,
       scoreBasisJson: toJson(t.scoreBasis ?? []),
       keywordsJson: toJson(t.keywords),
       subtopicsJson: toJson(t.subtopics),

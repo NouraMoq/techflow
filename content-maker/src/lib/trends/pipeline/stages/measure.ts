@@ -6,6 +6,12 @@ function daysBetween(a: string, b: string): number {
   return Number.isFinite(d) ? d : 0;
 }
 
+// Confidence inputs: how much we trust the source of a signal.
+const SOURCE_RELIABILITY: Record<string, number> = {
+  manual: 0.55, mock: 0.5, csv: 0.75, json: 0.75,
+  google_trends: 0.9, creative_center: 0.9, official_tiktok: 1, licensed: 0.95,
+};
+
 // Stage 3: measure growth from weighted signals (not just count). Deterministic —
 // recency is relative to the newest post in the batch, never "now".
 export const measureStage: PipelineStage = {
@@ -33,7 +39,15 @@ export const measureStage: PipelineStage = {
         w.velocity * velocity + w.views * viewsN + w.engagement * engagement +
         w.accounts * accounts + w.recency * recency + w.continuity * continuity + w.spread * spread;
 
-      t.growthScore = Math.round(score * 100);
+      t.growthScore = Math.round(score * 100); // Trend Score = strength/spread
+
+      // Confidence Score = data quantity + quality (metric completeness) + source reliability.
+      const sigs = ctx.signals.filter((sv) => t.signalIds.includes(sv.id));
+      const quantity = Math.min(1, n / 5);
+      const quality = sigs.length ? sigs.filter((sv) => (sv.metrics.views ?? 0) > 0 && !!sv.metrics.postedAt).length / sigs.length : 0;
+      const reliability = sigs.length ? sigs.reduce((a, sv) => a + (SOURCE_RELIABILITY[sv.source] ?? 0.5), 0) / sigs.length : 0.5;
+      t.confidence = Math.round(100 * (0.4 * quantity + 0.35 * quality + 0.25 * reliability));
+
       t.competition = n >= 6 ? "high" : n >= 3 ? "medium" : "low";
     }
     return ctx;

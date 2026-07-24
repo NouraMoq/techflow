@@ -78,11 +78,31 @@ export interface TopicDraft {
   growthScore: number;      // 0..100
   signalIds: string[];
   metrics: SignalMetrics;   // aggregated across signals
-  clientScore?: number;     // 0..100
+  clientScore?: number;     // 0..100 — fit for this client
+  confidence?: number;      // 0..100 — Confidence Score (analysis reliability)
   scoreBasis?: string[];
   fit?: Band;
   risk?: Band;
   angle?: string;
+}
+
+// ---- Level 3: Opportunity (may derive from a Trend OR an audience gap) ----
+
+export type OpportunityKind = "from_trend" | "audience_gap" | "low_competition";
+export interface OpportunityDraft {
+  key: string;              // stable natural key for idempotent upsert
+  title: string;
+  kind: OpportunityKind;
+  trendId?: string;
+  sourceQuestionId?: string;
+  reason: string;
+  score: number;            // 0..100 priority/fit
+  confidence?: number;      // 0..100
+}
+/** A pluggable opportunity detector — add new detectors without touching others. */
+export interface OpportunityDetector {
+  readonly name: string;
+  detect(tenantId: string): Promise<OpportunityDraft[]>;
 }
 
 /** Client context assembled from existing modules — read-only inputs to scoring. */

@@ -55,9 +55,11 @@ export default async function TrendDetailPage({ params }: { params: { id: string
 
       <div className="grid g-2" style={{ marginBottom: 16 }}>
         <div className="card card-pad">
-          <Bar label="درجة النمو" value={t.growthScore} />
+          <Bar label="قوة الترند (Trend Score)" value={t.growthScore} />
           <div style={{ height: 10 }} />
           <Bar label="ملاءمة العميل" value={t.clientScore ?? 0} accent />
+          <div style={{ height: 10 }} />
+          <Bar label="درجة الثقة (Confidence)" value={t.confidenceScore ?? 0} />
           <div className="row wrap" style={{ gap: 8, marginTop: 12, fontSize: 12.5 }}>
             <span className="faint">الملاءمة: <b>{t.fit ? FIT_LABEL[t.fit] ?? t.fit : "—"}</b></span>
             <span className="faint">المخاطر: <b style={{ color: highRisk ? "var(--rose)" : undefined }}>{t.risk ? RISK_LABEL[t.risk] ?? t.risk : "—"}</b></span>

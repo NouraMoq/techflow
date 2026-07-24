@@ -9,23 +9,31 @@ import HashtagCloud from "@/components/HashtagCloud";
 import { TREND_STATUS_LABEL, SENTIMENT_LABEL, COMPETITION_LABEL, TREND_SOURCE_LABEL } from "@/lib/trends/labels";
 import NewTrend from "./NewTrend";
 import DiscoverPanel from "./DiscoverPanel";
-import { setTrendDecision, convertTrendToIdea } from "./actions";
+import { setTrendDecision, detectOpportunitiesAction, convertOpportunityToIdea } from "./actions";
 
 type Tab = "discover" | "analyze" | "create";
 type Trend = Awaited<ReturnType<typeof prisma.trend.findMany>>[number];
+type Opp = Awaited<ReturnType<typeof prisma.trendOpportunity.findMany>>[number];
+
+const OPP_KIND: Record<string, { label: string; cls: string }> = {
+  from_trend: { label: "من ترند", cls: "b-primary" },
+  audience_gap: { label: "فجوة جمهور", cls: "b-amber" },
+  low_competition: { label: "منافسة منخفضة", cls: "b-green" },
+};
 
 export default async function TrendsPage({ searchParams }: { searchParams: { tab?: string } }) {
   const s = await requireSession();
   const tab: Tab = (["discover", "analyze", "create"].includes(searchParams.tab ?? "") ? searchParams.tab : "analyze") as Tab;
-  const [trends, topTags, signalCount] = await Promise.all([
+  const [trends, topTags, signalCount, opportunities] = await Promise.all([
     prisma.trend.findMany({ where: { tenantId: s.tid, deletedAt: null }, orderBy: [{ growthScore: "desc" }] }),
     getTopHashtags(s.tid, 20),
     prisma.trendSignal.count({ where: { tenantId: s.tid } }),
+    prisma.trendOpportunity.findMany({ where: { tenantId: s.tid, deletedAt: null }, orderBy: [{ score: "desc" }] }),
   ]);
   const mayManage = can(s.role, "trend.manage");
   const mayIdea = can(s.role, "idea.create");
-  const candidates = trends.filter((t) => t.status !== "actioned");
-  const actioned = trends.filter((t) => t.status === "actioned");
+  const openOpps = opportunities.filter((o) => o.status === "open");
+  const convertedOpps = opportunities.filter((o) => o.status === "converted");
 
   const TabLink = ({ id, label }: { id: Tab; label: string }) => (
     <Link href={`/trends?tab=${id}`} className={`btn ${tab === id ? "primary" : "btn-ghost"}`} style={{ fontSize: 13 }}>{label}</Link>
@@ -74,15 +82,28 @@ export default async function TrendsPage({ searchParams }: { searchParams: { tab
       )}
 
       {tab === "create" && (
-        <div className="grid g-2">
-          {candidates.map((t) => <CreateCard key={t.id} t={t} mayIdea={mayIdea} />)}
-          {actioned.map((t) => (
-            <div className="card card-pad" key={t.id} style={{ opacity: 0.75 }}>
-              <div className="row between"><b style={{ fontSize: 14 }}>{t.name}</b><span className="badge b-green">حُوّل لفكرة ✓</span></div>
+        <>
+          <div className="card card-pad" style={{ marginBottom: 16 }}>
+            <div className="row between" style={{ alignItems: "flex-start", gap: 12 }}>
+              <div>
+                <b style={{ fontSize: 15 }}>فرص صناعة المحتوى</b>
+                <p className="faint" style={{ fontSize: 12.5, marginTop: 4 }}>مشتقّة من الترندات الملائمة ومن <b>فجوات أسئلة جمهورك</b> (طلب متزايد + منافسة منخفضة) — حتى قبل تشكّل الترند.</p>
+              </div>
+              {mayManage && (
+                <form action={detectOpportunitiesAction}><button className="btn primary" style={{ fontSize: 13, whiteSpace: "nowrap" }}>اكتشف الفرص</button></form>
+              )}
             </div>
-          ))}
-          {trends.length === 0 && <div className="faint">لا ترندات جاهزة — استورد وحلّل أولًا.</div>}
-        </div>
+          </div>
+          <div className="grid g-2">
+            {openOpps.map((o) => <OppCard key={o.id} o={o} mayIdea={mayIdea} />)}
+            {convertedOpps.map((o) => (
+              <div className="card card-pad" key={o.id} style={{ opacity: 0.7 }}>
+                <div className="row between"><b style={{ fontSize: 14 }}>{o.title}</b><span className="badge b-green">حُوّلت لفكرة ✓</span></div>
+              </div>
+            ))}
+            {opportunities.length === 0 && <div className="faint">لا فرص بعد — اضغط «اكتشف الفرص» بعد تحليل ترندات أو إضافة أسئلة جمهور.</div>}
+          </div>
+        </>
       )}
     </>
   );
@@ -109,9 +130,10 @@ function TrendCard({ t, mayManage }: { t: Trend; mayManage: boolean }) {
         <ScoreBar label="درجة النمو" value={t.growthScore} />
         <ScoreBar label="ملاءمة العميل" value={t.clientScore ?? 0} accent />
       </div>
-      <div className="row wrap" style={{ gap: 6, fontSize: 12, marginBottom: 10 }}>
+      <div className="row wrap" style={{ gap: 8, fontSize: 12, marginBottom: 10 }}>
         <span className="faint">الملاءمة: <b>{t.fit ? FIT_LABEL[t.fit] ?? t.fit : "—"}</b></span>
         <span className="faint">المخاطر: <b style={{ color: t.risk === "high" ? "var(--rose)" : undefined }}>{t.risk ? RISK_LABEL[t.risk] ?? t.risk : "—"}</b></span>
+        <span className="faint">الثقة: <b>{t.confidenceScore ?? "—"}%</b></span>
       </div>
       <div className="row wrap" style={{ gap: 6 }}>
         <Link href={`/trends/${t.id}`} className="btn btn-soft" style={{ fontSize: 12, padding: "5px 11px" }}>التفاصيل والتحليل</Link>
@@ -128,25 +150,25 @@ function TrendCard({ t, mayManage }: { t: Trend; mayManage: boolean }) {
   );
 }
 
-// "اصنع محتوى" card: convert to idea, or block + alert if high-risk.
-function CreateCard({ t, mayIdea }: { t: Trend; mayIdea: boolean }) {
-  const highRisk = t.risk === "high";
+// Opportunity card (level 3): convert to idea. May link back to a Trend or stand alone.
+function OppCard({ o, mayIdea }: { o: Opp; mayIdea: boolean }) {
+  const k = OPP_KIND[o.kind] ?? OPP_KIND.from_trend;
   return (
     <div className="card card-pad">
-      <div className="row between" style={{ marginBottom: 8 }}>
-        <Link href={`/trends/${t.id}`} style={{ fontSize: 15, fontWeight: 800 }}>{t.name}</Link>
-        <span className="badge b-primary">ملاءمة {t.clientScore ?? 0}%</span>
+      <div className="row between" style={{ marginBottom: 8, gap: 8 }}>
+        {o.trendId
+          ? <Link href={`/trends/${o.trendId}`} style={{ fontSize: 14.5, fontWeight: 800 }}>{o.title}</Link>
+          : <b style={{ fontSize: 14.5 }}>{o.title}</b>}
+        <span className={`badge ${k.cls}`} style={{ whiteSpace: "nowrap" }}>{k.label}</span>
       </div>
-      {t.angle && <p className="faint" style={{ fontSize: 12.5, marginBottom: 10 }}>زاوية مقترحة: {t.angle}</p>}
-      {highRisk ? (
-        <div className="callout" style={{ background: "var(--rose-tint,#fee2e2)", padding: "8px 12px" }}>
-          <IconShield />
-          <div><b style={{ fontSize: 12.5 }}>ترند عالي الخطورة</b>
-            <p>لا يُنصح بالتحويل المباشر — راجع <Link href="/crisis">السمعة والأزمات</Link> أولًا.</p></div>
-        </div>
-      ) : mayIdea ? (
-        <form action={convertTrendToIdea}>
-          <input type="hidden" name="id" value={t.id} />
+      {o.reason && <p className="faint" style={{ fontSize: 12.5, marginBottom: 10 }}>{o.reason}</p>}
+      <div className="row wrap" style={{ gap: 8, fontSize: 12, marginBottom: 10 }}>
+        <span className="badge b-slate">أولوية {o.score}%</span>
+        {o.confidence != null && <span className="badge b-slate">ثقة {o.confidence}%</span>}
+      </div>
+      {mayIdea ? (
+        <form action={convertOpportunityToIdea}>
+          <input type="hidden" name="id" value={o.id} />
           <button className="btn primary" style={{ fontSize: 13 }}>حوّل إلى فكرة ←</button>
         </form>
       ) : <span className="faint" style={{ fontSize: 12 }}>تحتاج صلاحية إنشاء الأفكار.</span>}

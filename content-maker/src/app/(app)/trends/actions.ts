@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { requireSession, assertCan } from "@/lib/session";
 import { analyzeFromSource } from "@/lib/trends/analyze";
+import { detectOpportunities } from "@/lib/trends/opportunity";
 import { TrendSourceNotConfiguredError, type TrendSource } from "@/lib/trends/types";
 
 export type TrendState = { error?: string; ok?: boolean };
@@ -123,6 +124,48 @@ export async function convertTrendToIdea(formData: FormData): Promise<void> {
   await prisma.trend.updateMany({ where: { id: trend.id, tenantId: s.tid }, data: { status: "actioned", decision: "used" } });
   await prisma.auditLog.create({
     data: { tenantId: s.tid, userId: s.uid, action: "trend.convert", entity: "Trend", entityId: trend.id, metaJson: JSON.stringify({ ideaId: idea.id }) },
+  });
+  revalidatePath("/trends");
+  revalidatePath("/ideas");
+}
+
+// ---- Level 3: Opportunities (detect from trends + audience gaps) ----
+export async function detectOpportunitiesAction(): Promise<void> {
+  const s = await requireSession();
+  try { assertCan(s, "trend.manage"); } catch { return; }
+  const n = await detectOpportunities(s.tid, s.uid);
+  await prisma.auditLog.create({
+    data: { tenantId: s.tid, userId: s.uid, action: "trend.opportunities.detect", entity: "TrendOpportunity", metaJson: JSON.stringify({ count: n }) },
+  });
+  revalidatePath("/trends");
+}
+
+export async function convertOpportunityToIdea(formData: FormData): Promise<void> {
+  const s = await requireSession();
+  try { assertCan(s, "idea.create"); } catch { return; }
+  const id = String(formData.get("id") ?? "");
+  const opp = await prisma.trendOpportunity.findFirst({ where: { id, tenantId: s.tid, deletedAt: null } });
+  if (!opp || opp.status === "converted") return;
+  const creator = await prisma.creator.findFirst({ where: { tenantId: s.tid, deletedAt: null } });
+  if (!creator) return;
+
+  const idea = await prisma.idea.create({
+    data: {
+      tenantId: s.tid, creatorId: creator.id,
+      title: opp.title,
+      description: opp.reason ?? null,
+      status: "proposed", priority: "medium",
+      fitScore: opp.score,
+      sourceTrendId: opp.trendId ?? null,
+      sourceOpportunityId: opp.id,
+      ownerId: s.uid, createdBy: s.uid,
+      tagsJson: JSON.stringify(["فرصة"]),
+    },
+  });
+  await prisma.trendOpportunity.updateMany({ where: { id: opp.id, tenantId: s.tid }, data: { status: "converted", result: "حُوّلت إلى فكرة" } });
+  if (opp.trendId) await prisma.trend.updateMany({ where: { id: opp.trendId, tenantId: s.tid }, data: { status: "actioned", decision: "used" } });
+  await prisma.auditLog.create({
+    data: { tenantId: s.tid, userId: s.uid, action: "trend.opportunity.convert", entity: "TrendOpportunity", entityId: opp.id, metaJson: JSON.stringify({ ideaId: idea.id }) },
   });
   revalidatePath("/trends");
   revalidatePath("/ideas");

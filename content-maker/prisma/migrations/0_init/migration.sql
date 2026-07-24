@@ -137,6 +137,7 @@ CREATE TABLE "Idea" (
     "cta" TEXT,
     "tagsJson" TEXT,
     "sourceTrendId" TEXT,
+    "sourceOpportunityId" TEXT,
     "ownerId" TEXT,
     "createdBy" TEXT,
     "updatedBy" TEXT,
@@ -634,6 +635,7 @@ CREATE TABLE "Trend" (
     "firstSeenAt" TIMESTAMP(3),
     "lastSeenAt" TIMESTAMP(3),
     "clientScore" INTEGER,
+    "confidenceScore" INTEGER,
     "scoreBasisJson" TEXT,
     "keywordsJson" TEXT,
     "subtopicsJson" TEXT,
@@ -665,6 +667,28 @@ CREATE TABLE "TrendSignal" (
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "TrendSignal_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "TrendOpportunity" (
+    "id" TEXT NOT NULL,
+    "tenantId" TEXT NOT NULL,
+    "key" TEXT NOT NULL,
+    "title" TEXT NOT NULL,
+    "kind" TEXT NOT NULL,
+    "trendId" TEXT,
+    "sourceQuestionId" TEXT,
+    "reason" TEXT,
+    "score" INTEGER NOT NULL DEFAULT 0,
+    "confidence" INTEGER,
+    "status" TEXT NOT NULL DEFAULT 'open',
+    "result" TEXT,
+    "createdBy" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "deletedAt" TIMESTAMP(3),
+
+    CONSTRAINT "TrendOpportunity_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -892,6 +916,12 @@ CREATE INDEX "TrendSignal_tenantId_idx" ON "TrendSignal"("tenantId");
 CREATE INDEX "TrendSignal_clusterTrendId_idx" ON "TrendSignal"("clusterTrendId");
 
 -- CreateIndex
+CREATE INDEX "TrendOpportunity_tenantId_idx" ON "TrendOpportunity"("tenantId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "TrendOpportunity_tenantId_key_key" ON "TrendOpportunity"("tenantId", "key");
+
+-- CreateIndex
 CREATE INDEX "EditorialCalendarItem_tenantId_idx" ON "EditorialCalendarItem"("tenantId");
 
 -- CreateIndex
@@ -1070,6 +1100,9 @@ ALTER TABLE "TrendSignal" ADD CONSTRAINT "TrendSignal_tenantId_fkey" FOREIGN KEY
 
 -- AddForeignKey
 ALTER TABLE "TrendSignal" ADD CONSTRAINT "TrendSignal_clusterTrendId_fkey" FOREIGN KEY ("clusterTrendId") REFERENCES "Trend"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "TrendOpportunity" ADD CONSTRAINT "TrendOpportunity_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "EditorialCalendarItem" ADD CONSTRAINT "EditorialCalendarItem_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id") ON DELETE RESTRICT ON UPDATE CASCADE;

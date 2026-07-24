@@ -49,6 +49,7 @@ model Tenant {
   shootSessions ShootSession[]
   trends        Trend[]
   trendSignals  TrendSignal[]
+  trendOpportunities TrendOpportunity[]
   editorialItems EditorialCalendarItem[]
   audienceQuestions AudienceQuestion[]
   audienceListItems AudienceListItem[]
@@ -206,6 +207,7 @@ model Idea {
   cta         String?
   tagsJson    String?  // JSON string[]
   sourceTrendId String? // optional link back to the source Trend (Trend Intelligence)
+  sourceOpportunityId String? // optional link back to the TrendOpportunity (level 3)
   ownerId     String?
   owner       User?    @relation("IdeaOwner", fields: [ownerId], references: [id])
   createdBy   String?
@@ -788,6 +790,7 @@ model Trend {
   firstSeenAt       DateTime?
   lastSeenAt        DateTime?
   clientScore       Int?     // 0..100 fit for this tenant's creator
+  confidenceScore   Int?     // 0..100 — system confidence in the analysis (data quantity/quality/source)
   scoreBasisJson    String?  // JSON string[] — human-readable basis (like recommendations)
   keywordsJson      String?  // JSON string[]
   subtopicsJson     String?  // JSON string[]
@@ -825,6 +828,31 @@ model TrendSignal {
 
   @@index([tenantId])
   @@index([clusterTrendId])
+}
+
+// Level 3: a content OPPORTUNITY — may come from a Trend OR from an audience gap
+// (rising questions + low competition) even before a full trend forms.
+model TrendOpportunity {
+  id               String   @id @default(cuid())
+  tenantId         String
+  tenant           Tenant   @relation(fields: [tenantId], references: [id])
+  key              String   // stable natural key for idempotent upsert (e.g. "trend:<id>" | "q:<id>")
+  title            String
+  kind             String   // from_trend | audience_gap | low_competition
+  trendId          String?  // optional link to the originating Trend
+  sourceQuestionId String?  // optional link to an AudienceQuestion (gap-based)
+  reason           String?  // human-readable basis
+  score            Int      @default(0) // priority/fit 0..100
+  confidence       Int?     // 0..100
+  status           String   @default("open") // open | converted | dismissed
+  result           String?
+  createdBy        String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  deletedAt        DateTime?
+
+  @@unique([tenantId, key])
+  @@index([tenantId])
 }
 
 // ============================================================================
