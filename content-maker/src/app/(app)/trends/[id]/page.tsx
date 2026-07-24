@@ -119,10 +119,13 @@ export default async function TrendDetailPage({ params }: { params: { id: string
         ) : t.status === "actioned" ? (
           <span className="badge b-green">تم تحويله إلى فكرة ✓ — راجع <Link href="/ideas">بنك الأفكار</Link></span>
         ) : mayIdea ? (
-          <form action={convertTrendToIdea}>
-            <input type="hidden" name="id" value={t.id} />
-            <button className="btn primary" style={{ fontSize: 14 }}>حوّل إلى فكرة في بنك الأفكار ←</button>
-          </form>
+          <div className="row wrap" style={{ gap: 8, alignItems: "center" }}>
+            <Link href={`/trends/${t.id}/generate`} className="btn primary" style={{ fontSize: 14 }}>اصنع محتوى (أفكار + سيناريو) ←</Link>
+            <form action={convertTrendToIdea}>
+              <input type="hidden" name="id" value={t.id} />
+              <button className="btn btn-soft" style={{ fontSize: 13 }}>تحويل سريع إلى فكرة</button>
+            </form>
+          </div>
         ) : <span className="faint">تحتاج صلاحية إنشاء الأفكار للتحويل.</span>}
       </div>
     </>

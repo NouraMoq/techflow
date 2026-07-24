@@ -105,6 +105,38 @@ export interface OpportunityDetector {
   detect(tenantId: string): Promise<OpportunityDraft[]>;
 }
 
+// ---- Content generation (turn a topic into ready content briefs) ----
+
+export interface GenTopic {
+  name: string;
+  keywords: string[];
+  hashtags: string[];
+  hooks: string[];
+  subtopics: string[];
+  questions: string[];
+  sentiment: Sentiment;
+  angle?: string;
+}
+/** A ready-to-use content brief proposal (not persisted until the user picks it). */
+export interface ContentDraft {
+  angleKey: string;        // educational | opinion | listicle
+  angleLabel: string;
+  title: string;
+  goal: string;
+  angle: string;
+  hook: string;
+  shortScript: string;
+  description: string;
+  cta: string;
+  hashtags: string[];
+  reason: string;
+}
+/** Rule-based now; swap for a model-backed generator behind this interface. */
+export interface ContentGenerator {
+  readonly name: string;
+  generate(topic: GenTopic, client: ClientContext): Promise<ContentDraft[]>;
+}
+
 /** Client context assembled from existing modules — read-only inputs to scoring. */
 export interface ClientContext {
   vision?: string;

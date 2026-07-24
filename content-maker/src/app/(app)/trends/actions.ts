@@ -1,6 +1,7 @@
 "use server";
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { requireSession, assertCan } from "@/lib/session";
 import { analyzeFromSource } from "@/lib/trends/analyze";
@@ -169,4 +170,62 @@ export async function convertOpportunityToIdea(formData: FormData): Promise<void
   });
   revalidatePath("/trends");
   revalidatePath("/ideas");
+}
+
+// ---- "اصنع محتوى": turn a generated draft into an Idea (and optionally a Script) ----
+async function resolveDraft(formData: FormData) {
+  const trendId = String(formData.get("trendId") ?? "") || null;
+  const title = String(formData.get("title") ?? "").trim();
+  const description = String(formData.get("description") ?? "") || null;
+  const cta = String(formData.get("cta") ?? "") || null;
+  const hook = String(formData.get("hook") ?? "") || null;
+  const shortScript = String(formData.get("shortScript") ?? "") || null;
+  const hashtags = String(formData.get("hashtags") ?? "").split(/[ ,;|]+/).filter(Boolean);
+  return { trendId, title, description, cta, hook, shortScript, hashtags };
+}
+
+export async function createIdeaFromDraft(formData: FormData): Promise<void> {
+  const s = await requireSession();
+  try { assertCan(s, "idea.create"); } catch { return; }
+  const d = await resolveDraft(formData);
+  if (!d.title) return;
+  const creator = await prisma.creator.findFirst({ where: { tenantId: s.tid, deletedAt: null } });
+  if (!creator) return;
+  const trend = d.trendId ? await prisma.trend.findFirst({ where: { id: d.trendId, tenantId: s.tid, deletedAt: null }, select: { clientScore: true } }) : null;
+  const idea = await prisma.idea.create({
+    data: {
+      tenantId: s.tid, creatorId: creator.id, title: d.title, description: d.description, cta: d.cta,
+      status: "proposed", priority: "medium", fitScore: trend?.clientScore ?? 0,
+      sourceTrendId: d.trendId, ownerId: s.uid, createdBy: s.uid, tagsJson: JSON.stringify(["ترند", "مُولّد"]),
+    },
+  });
+  await prisma.auditLog.create({ data: { tenantId: s.tid, userId: s.uid, action: "trend.generate.idea", entity: "Idea", entityId: idea.id, metaJson: d.trendId ? JSON.stringify({ trendId: d.trendId }) : null } });
+  revalidatePath("/ideas"); revalidatePath("/trends");
+  redirect("/ideas");
+}
+
+export async function createIdeaAndScriptFromDraft(formData: FormData): Promise<void> {
+  const s = await requireSession();
+  try { assertCan(s, "idea.create"); assertCan(s, "script.write"); } catch { return; }
+  const d = await resolveDraft(formData);
+  if (!d.title) return;
+  const creator = await prisma.creator.findFirst({ where: { tenantId: s.tid, deletedAt: null } });
+  if (!creator) return;
+  const trend = d.trendId ? await prisma.trend.findFirst({ where: { id: d.trendId, tenantId: s.tid, deletedAt: null }, select: { clientScore: true } }) : null;
+  const idea = await prisma.idea.create({
+    data: {
+      tenantId: s.tid, creatorId: creator.id, title: d.title, description: d.description, cta: d.cta,
+      status: "scripting", priority: "medium", fitScore: trend?.clientScore ?? 0,
+      sourceTrendId: d.trendId, ownerId: s.uid, createdBy: s.uid, tagsJson: JSON.stringify(["ترند", "مُولّد"]),
+    },
+  });
+  const script = await prisma.script.create({
+    data: {
+      tenantId: s.tid, ideaId: idea.id, title: d.title, hook: d.hook, body: d.shortScript, cta: d.cta,
+      description: d.description, hashtagsJson: JSON.stringify(d.hashtags), status: "draft", version: 1, createdBy: s.uid,
+    },
+  });
+  await prisma.auditLog.create({ data: { tenantId: s.tid, userId: s.uid, action: "trend.generate.script", entity: "Script", entityId: script.id, metaJson: JSON.stringify({ ideaId: idea.id, trendId: d.trendId }) } });
+  revalidatePath("/ideas"); revalidatePath("/scripts");
+  redirect(`/scripts/${script.id}`);
 }
