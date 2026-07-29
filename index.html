@@ -23,7 +23,7 @@
 <meta name="twitter:description" content="Intelligent digital products, AI solutions, data platforms, and workflow automation.">
 <meta name="twitter:image" content="https://novametrics.sa/og-cover.png">
 <script type="application/ld+json">
-{"@context":"https://schema.org","@type":"Organization","name":"Novametrics","alternateName":"نوفاميتريكس","url":"https://novametrics.sa/","description":"Novametrics builds intelligent digital products, AI-powered solutions, data platforms, and workflow automation tools for organizations.","slogan":"Building Smarter Decisions","email":"info@novametrics.sa","address":{"@type":"PostalAddress","addressLocality":"Riyadh","addressCountry":"SA"}}
+{"@context":"https://schema.org","@type":"Organization","name":"Novametrics","alternateName":"نوفاميتريكس","url":"https://novametrics.sa/","description":"Novametrics builds intelligent digital products, AI-powered solutions, data platforms, and workflow automation tools for organizations.","slogan":"Building Smarter Decisions","email":"CS@novametrics.sa","address":{"@type":"PostalAddress","addressLocality":"Riyadh","addressCountry":"SA"}}
 </script>
 <!-- Brand fonts: Poppins (Latin) + Cairo (Arabic) — geometric, matching the logo wordmark -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -1016,7 +1016,7 @@ const I18N={
     ],
     sectors:['جهات حكومية','قطاع التجزئة','قطاع الطاقة','الاتصالات','القطاع الصحي'],
     /* nav / shell */
-    nav_dashboard:'لوحة التحكم', nav_projects:'المشاريع', nav_reports:'التقارير', nav_executive:'الإدارة التنفيذية', nav_settings:'الإعدادات',
+    nav_dashboard:'لوحة التحكم', nav_projects:'المشاريع', nav_reports:'التقارير', nav_executive:'الإدارة التنفيذية', nav_inquiries:'الاستفسارات', nav_settings:'الإعدادات',
     search_ph:'ابحث عن مشروع، عميل، مرحلة…', account:'الحساب',
     /* dashboard */
     dash_title:'لوحة التحكم', dash_sub:'نظرة عامة على أداء المشاريع ودورة حياتها', overall:'نسبة الإنجاز العامة',
@@ -1087,7 +1087,7 @@ const I18N={
       ['<circle cx="9" cy="8" r="3"/><path d="M3 20a6 6 0 0 1 12 0"/><path d="M16 6a3 3 0 0 1 0 6"/>','Specialized team','Talent across design, development and project management.'],
     ],
     sectors:['Government','Retail','Energy','Telecom','Healthcare'],
-    nav_dashboard:'Dashboard', nav_projects:'Projects', nav_reports:'Reports', nav_executive:'Executive', nav_settings:'Settings',
+    nav_dashboard:'Dashboard', nav_projects:'Projects', nav_reports:'Reports', nav_executive:'Executive', nav_inquiries:'Inquiries', nav_settings:'Settings',
     search_ph:'Search projects, clients, stages…', account:'Account',
     dash_title:'Dashboard', dash_sub:'Overview of project performance and lifecycle', overall:'Overall progress',
     kpi_total:'Total projects', kpi_running:'In-progress', kpi_done:'Completed', kpi_late:'Delayed', kpi_paused:'Paused', kpi_devs:'Developers',
@@ -1270,8 +1270,11 @@ function showPolicy(kind){
     <h3>${title}</h3><div class="m-sub" style="margin-top:10px;line-height:1.7">${body}</div>
     <div class="modal-actions"><button class="btn" onclick="closeModal()">${t('close')}</button></div></div></div>`;
 }
-/* Contact form — front-end only. See the TODO inside submitContact() for backend wiring. */
-function submitContact(){
+/* مفتاح Web3Forms — إشعار البريد إلى CS@novametrics.sa (معرّف نموذج عام، آمن في الكود). */
+const WEB3FORMS_ACCESS_KEY='3b9962e2-a61d-48f1-a321-f95b67d16b83';
+/* نموذج التواصل — يحفظ الاستفسار في Firestore (collection: contactInquiries) ويُرسل إشعار بريد عبر Web3Forms.
+   لا يُظهر رسالة نجاح إلا إذا نجح الحفظ أو البريد فعليًا؛ وإلا يوجّه العميل للبريد المباشر. */
+async function submitContact(){
   const gv=id=>($('#'+id)?.value||'').trim();
   const name=gv('cfName'), org=gv('cfOrg'), email=gv('cfEmail'), phone=gv('cfPhone'), type=gv('cfType'), desc=gv('cfDesc');
   const msg=$('#cfMsg');
@@ -1280,14 +1283,35 @@ function submitContact(){
   if(!org)  return show(TR('يرجى إدخال اسم الجهة.','Please enter the organization name.'),false);
   if(!EMAIL_RE.test(email)) return show(TR('يرجى إدخال بريد إلكتروني صحيح.','Please enter a valid email.'),false);
   if(!desc) return show(TR('يرجى إدخال وصف مختصر للاحتياج.','Please add a short description of your need.'),false);
-  /* === TODO (backend): no submission endpoint is wired yet ===
-     Replace the console.log below with a real submission, e.g.:
-       fetch('/api/contact', { method:'POST', headers:{'Content-Type':'application/json'},
-         body: JSON.stringify({ name, org, email, phone, type, desc }) })
-     or an email/form service (Formspree, EmailJS, a Firebase Cloud Function, etc.). */
-  console.log('[contact] pending submission →', { name, org, email, phone, type, desc });
-  ['cfName','cfOrg','cfEmail','cfPhone','cfDesc'].forEach(id=>{ const el=$('#'+id); if(el)el.value=''; });
-  show(TR('تم استلام طلبك بنجاح — سنتواصل معكم قريبًا.','Your request was received — we’ll get back to you soon.'),true);
+  const btn=$('#cfSubmitBtn'); if(btn)btn.disabled=true;
+  show(TR('جارٍ الإرسال…','Sending…'),true);
+  let stored=false, mailed=false;
+  // 1) حفظ في Firestore (أفضل جهد — يحتاج قاعدة create عامة على contactInquiries)
+  try{
+    await db.collection('contactInquiries').add({ name, org, email, phone, type, desc,
+      lang:curLang(), status:'new', source:'website',
+      createdAt:firebase.firestore.FieldValue.serverTimestamp() });
+    stored=true;
+  }catch(e){ console.warn('inquiry firestore write failed', (e&&e.code)||e); }
+  // 2) إشعار بريد عبر Web3Forms (إن وُجد المفتاح)
+  if(WEB3FORMS_ACCESS_KEY){
+    try{
+      const r=await fetch('https://api.web3forms.com/submit',{ method:'POST',
+        headers:{'Content-Type':'application/json', Accept:'application/json'},
+        body:JSON.stringify({ access_key:WEB3FORMS_ACCESS_KEY,
+          subject:`استفسار جديد من الموقع: ${type} — ${org}`,
+          from_name:name, replyto:email, email,
+          message:`الاسم: ${name}\nالجهة: ${org}\nالبريد: ${email}\nالجوال: ${phone||'—'}\nنوع الطلب: ${type}\n\nالوصف:\n${desc}` }) });
+      mailed=r.ok;
+    }catch(e){ console.warn('inquiry email failed', e); }
+  }
+  if(btn)btn.disabled=false;
+  if(stored||mailed){
+    ['cfName','cfOrg','cfEmail','cfPhone','cfDesc'].forEach(id=>{ const el=$('#'+id); if(el)el.value=''; });
+    show(TR('تم استلام طلبك بنجاح — سنتواصل معكم قريبًا.','Your request was received — we’ll get back to you soon.'),true);
+  }else{
+    show(TR('تعذّر الإرسال حاليًا. يرجى مراسلتنا مباشرة على CS@novametrics.sa','Could not submit right now. Please email us directly at CS@novametrics.sa'),false);
+  }
 }
 
 function showLanding(){ $('#app').classList.remove('on'); $('#auth').classList.remove('on'); $('#landing').style.display='block'; renderLanding(); try{window.scrollTo(0,0);}catch(e){} }
@@ -1426,8 +1450,8 @@ function renderLanding(){
         <div class="field cform-full"><label>${TR('وصف مختصر للاحتياج','Short description of your need')}</label><textarea id="cfDesc" rows="4" maxlength="2000"></textarea></div>
       </div>
       <div id="cfMsg" class="cform-msg" style="display:none"></div>
-      <button type="submit" class="btn primary lg" style="margin-top:6px">${TR('إرسال','Send')}</button>
-      <div class="ci-sub" style="margin-top:10px">${TR('أو راسلنا مباشرة:','Or email us directly:')} <a href="mailto:info@novametrics.sa" dir="ltr" style="color:var(--primary-ink);font-weight:700">info@novametrics.sa</a></div>
+      <button id="cfSubmitBtn" type="submit" class="btn primary lg" style="margin-top:6px">${TR('إرسال','Send')}</button>
+      <div class="ci-sub" style="margin-top:10px">${TR('أو راسلنا مباشرة:','Or email us directly:')} <a href="mailto:CS@novametrics.sa" dir="ltr" style="color:var(--primary-ink);font-weight:700">CS@novametrics.sa</a></div>
     </form>
   </section>
 
@@ -1674,6 +1698,7 @@ function renderShell(){
     {k:'projects',t:t('nav_projects'),show:true,ic:'<path d="M3 7h18M3 7l2-3h14l2 3M3 7v11a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V7"/><path d="M9 12h6"/>'},
     {k:'reports',t:t('nav_reports'),show:can('reports'),ic:'<path d="M4 20V4M4 20h16M8 16v-5M12 16V8M16 16v-8"/>'},
     {k:'executive',t:t('nav_executive'),show:true,ic:'<path d="M3 21h18M5 21V7l7-4 7 4v14M9 9h.01M9 13h.01M9 17h.01M15 9h.01M15 13h.01M15 17h.01"/>'},
+    {k:'inquiries',t:t('nav_inquiries'),show:can('reports'),ic:'<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/>'},
     {k:'settings',t:t('nav_settings'),show:can('settings'),ic:'<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-2.7 1.1V21a2 2 0 0 1-4 0v-.2A1.6 1.6 0 0 0 6.6 19l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1A1.6 1.6 0 0 0 3 13.4H3a2 2 0 0 1 0-4h.1A1.6 1.6 0 0 0 4.6 6.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1A1.6 1.6 0 0 0 10 3V3a2 2 0 0 1 4 0v.1a1.6 1.6 0 0 0 2.7 1.1l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0 1.1 2.7H21a2 2 0 0 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1.3z"/>'},
   ];
   $('#navMenu').innerHTML=items.filter(i=>i.show).map(i=>
@@ -1699,7 +1724,7 @@ function go(name,params={},push=true){
   setActiveNav(navKey);
   const v=$('#view'); v.scrollTop=0;
   try{
-    ({dashboard:renderDashboard,projects:renderProjects,project:renderProject,stage:renderStage,reports:renderReports,executive:renderExecutive,settings:renderSettings,search:renderSearch}[name]||renderDashboard)(params);
+    ({dashboard:renderDashboard,projects:renderProjects,project:renderProject,stage:renderStage,reports:renderReports,executive:renderExecutive,inquiries:renderInquiries,settings:renderSettings,search:renderSearch}[name]||renderDashboard)(params);
   }catch(e){
     console.error('render error',name,e);
     $('#view').innerHTML=`<div style="padding:34px;text-align:center;color:var(--muted)"><div style="font-size:15px;font-weight:700;color:var(--rose);margin-bottom:8px">تعذّر عرض هذه الصفحة</div><div style="font-size:13px">حدث خطأ أثناء التحميل. جرّبي تحديث الصفحة. إن استمرّ، أرسلي هذه الرسالة: ${escapeHtml(e&&e.message||'')}</div></div>`;
@@ -1714,6 +1739,46 @@ function updateBackBtn(){
   const b=$('#backBtn'); if(!b)return;
   b.disabled = navStack.length===0 && view.name==='dashboard';
 }
+
+/* =========================================================
+   INQUIRIES — استفسارات العملاء (نموذج «تواصل معنا»)
+   ========================================================= */
+async function renderInquiries(){
+  const v=$('#view'), ar=curLang()==='ar';
+  v.innerHTML=`
+  <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:6px">
+    <div><h1 style="font-size:22px;font-weight:800">${t('nav_inquiries')}</h1>
+    <div style="color:var(--muted);font-size:13.5px;margin-top:2px">${ar?'استفسارات العملاء الواردة من نموذج «تواصل معنا» في الموقع.':'Customer inquiries from the website contact form.'}</div></div>
+    <div style="flex:1"></div>
+    <button class="btn" onclick="go('inquiries',{},false)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:15px;height:15px"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg> ${ar?'تحديث':'Refresh'}</button>
+  </div>
+  <div id="inqBody" style="margin-top:14px;color:var(--muted)">${ar?'جارٍ التحميل…':'Loading…'}</div>`;
+  const body=$('#inqBody');
+  try{
+    const snap=await db.collection('contactInquiries').orderBy('createdAt','desc').limit(200).get();
+    if(snap.empty){ body.innerHTML=`<div class="card" style="padding:26px;text-align:center;color:var(--muted)">${ar?'لا توجد استفسارات بعد.':'No inquiries yet.'}</div>`; return; }
+    const cards=[];
+    snap.forEach(doc=>{ const d=doc.data(); const dt=(d.createdAt&&d.createdAt.toDate)?d.createdAt.toDate():null; const done=d.status==='handled';
+      cards.push(`<div class="card" style="padding:14px 16px;margin-bottom:10px;${done?'opacity:.62':''}">
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+          <span style="font-weight:800;font-size:15px">${escapeHtml(d.name||'')}</span>
+          <span style="color:var(--muted)">${escapeHtml(d.org||'')}</span>
+          <span style="font-size:11px;font-weight:700;color:var(--primary-ink);background:var(--primary-tint);border-radius:20px;padding:2px 9px">${escapeHtml(d.type||'')}</span>
+          ${done?`<span style="font-size:11px;font-weight:700;color:var(--green);background:var(--green-tint);border-radius:20px;padding:2px 9px">${ar?'تمّت المعالجة':'Handled'}</span>`:''}
+          <span style="flex:1"></span>
+          <span class="num" style="color:var(--faint);font-size:12px">${dt?dt.toLocaleString(ar?'ar-SA':'en-GB'):''}</span>
+        </div>
+        <div style="margin-top:6px;font-size:13px"><a href="mailto:${escapeHtml(d.email||'')}" dir="ltr" style="color:var(--primary-ink);font-weight:600">${escapeHtml(d.email||'')}</a>${d.phone?` · <span dir="ltr">${escapeHtml(d.phone)}</span>`:''}</div>
+        <div style="margin-top:8px;font-size:13.5px;line-height:1.6;white-space:pre-wrap">${escapeHtml(d.desc||'')}</div>
+        <div style="margin-top:10px"><button class="btn sm" onclick="toggleInquiry('${doc.id}','${done?'new':'handled'}')">${done?(ar?'إرجاع كجديد':'Mark as new'):(ar?'تمّت المعالجة':'Mark handled')}</button></div>
+      </div>`);
+    });
+    body.innerHTML=cards.join('');
+  }catch(e){
+    body.innerHTML=`<div class="card" style="padding:22px;text-align:center;color:var(--rose)">${ar?'تعذّر تحميل الاستفسارات. تأكّدي من قواعد Firestore (السماح بالقراءة للمسجّلين).':'Could not load inquiries. Check Firestore rules (allow read for signed-in staff).'}<div style="font-size:12px;color:var(--muted);margin-top:6px">${escapeHtml((e&&e.message)||'')}</div></div>`;
+  }
+}
+async function toggleInquiry(id,status){ try{ await db.collection('contactInquiries').doc(id).set({status,handledAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true}); go('inquiries',{},false); }catch(e){ toast(TR('تعذّر التحديث','Update failed')); } }
 
 /* =========================================================
    DASHBOARD
