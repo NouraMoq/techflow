@@ -104,6 +104,9 @@ a{color:inherit}
   background:color-mix(in srgb,var(--surface) 82%,transparent);backdrop-filter:blur(10px);border-bottom:1px solid var(--border)}
 .lp-nav .brand{margin-bottom:0}
 .lp-nav .grow{flex:1}
+.nm-logo{display:inline-flex;align-items:center}
+.nm-logo img{height:var(--logo-h,36px);width:auto;display:block}
+html[data-theme="dark"] .nm-logo{background:#fff;border-radius:11px;padding:4px 10px}
 .lp-hero{position:relative;overflow:hidden;padding:66px 28px 54px;text-align:center;
   background:radial-gradient(1100px 520px at 80% -20%,var(--primary-tint),transparent 55%),radial-gradient(900px 480px at 10% 0%,var(--accent-tint),transparent 55%),var(--bg)}
 .lp-hero .eyebrow{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;font-weight:700;color:var(--primary-ink);
@@ -658,8 +661,8 @@ a{color:inherit}
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="m12 5 7 7-7 7"/></svg>
     </button>
     <div class="brand-sm">
-      <div class="mark"><svg viewBox="368 366 460 467" xmlns="http://www.w3.org/2000/svg" fill="none"><rect x="387" y="385.165" width="199" height="197" rx="23" fill="#3B82F6"/><path d="M387 640.165C387 627.462 397.293 617.165 409.995 617.165C454.348 617.165 514.54 617.165 528 617.165C544 617.165 556.943 617.165 567 617.165C578.886 617.165 586 617.165 586 617.165V791.165C586 803.867 575.703 814.165 563 814.165H410C397.297 814.165 387 803.867 387 791.165V640.165Z" fill="#14B8A6"/><path d="M528 584.165V617.165H567L530.301 585.474L528 584.165Z" fill="#14B8A6"/><rect x="610" y="385.165" width="199" height="197" rx="23" fill="#0F172A"/><path d="M638 581.124L639.5 582.665L670.5 606.665L671.191 581.124L638 581.124Z" fill="#0F172A"/><rect x="610" y="617.165" width="199" height="197" rx="23" fill="#A78BFA"/><path d="M474 451.165V617.165H527V583.165L724.5 751.165V582.165H671.5V606.665L474 451.165Z" fill="#fff"/></svg></div>
-      <div class="bs-names"><span id="brandName">NovaMetrics</span><span class="brand-alt" id="brandAlt">نوفاميتريكس</span></div>
+      <div class="nm-logo" style="--logo-h:32px" aria-label="NovaMetrics نوﭬاميتريكس"><img src="logo-wide.svg" alt="NovaMetrics نوﭬاميتريكس"></div>
+      <div class="bs-names" style="display:none"><span id="brandName">NovaMetrics</span><span class="brand-alt" id="brandAlt">نوفاميتريكس</span></div>
     </div>
     <div class="search-wrap">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
@@ -1333,7 +1336,7 @@ function renderLanding(){
 
   $('#landing').innerHTML=`
   <nav class="lp-nav">
-    <div class="brand"><div class="mark">${MARK_SVG}</div>${brandBlock(18)}</div>
+    <div class="nm-logo" style="--logo-h:38px" aria-label="NovaMetrics نوﭬاميتريكس"><img src="logo-wide.svg" alt="NovaMetrics نوﭬاميتريكس"></div>
     <div class="lp-links">${navLinks.map(l=>`<button onclick="scrollToId('${l[0]}')">${l[1]}</button>`).join('')}</div>
     <div class="grow"></div>
     ${langBtn()}
@@ -1430,7 +1433,7 @@ function renderLanding(){
 
   <footer class="lp-foot">
     <div class="lp-foot-top">
-      <div class="lp-foot-brand"><div class="brand"><div class="mark">${MARK_SVG}</div>${brandBlock(17)}</div>
+      <div class="lp-foot-brand"><div class="nm-logo" style="--logo-h:34px" aria-label="NovaMetrics نوﭬاميتريكس"><img src="logo-wide.svg" alt="NovaMetrics نوﭬاميتريكس"></div>
         <div class="lp-foot-tag">${TR('نوفاميتريكس — نبني قرارات أذكى','Novametrics — Building Smarter Decisions')}</div></div>
       <div class="lp-foot-links">
         ${navLinks.map(l=>`<button onclick="scrollToId('${l[0]}')">${l[1]}</button>`).join('')}
@@ -1451,7 +1454,7 @@ function renderAuth(mode='login'){
   const head=`<div style="display:flex;align-items:center">
     <a class="back-home" onclick="showLanding()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5"/><path d="m12 5 7 7-7 7"/></svg>${t('a_home')}</a>
     <div style="flex:1"></div>${langBtn()}</div>
-    <div class="brand" style="margin-top:6px"><div class="mark">${MARK_SVG}</div>${brandBlock(19)}</div>`;
+    <div class="nm-logo" style="margin-top:6px;--logo-h:40px" aria-label="NovaMetrics نوﭬاميتريكس"><img src="logo-wide.svg" alt="NovaMetrics نوﭬاميتريكس"></div>`;
   const err=`<div class="auth-err hidden" id="authErr"></div>`;
   let body='';
   if(isReset){
@@ -1594,7 +1597,7 @@ async function doLogin(id){
 function showPending(u){
   $('#landing').style.display='none'; $('#app').classList.remove('on'); $('#auth').classList.add('on');
   $('#auth').innerHTML=`<div class="auth-card">
-    <div class="brand" style="margin-top:2px"><div class="mark">${MARK_SVG}</div>${brandBlock(19)}</div>
+    <div class="nm-logo" style="margin-top:2px;--logo-h:40px" aria-label="NovaMetrics نوﭬاميتريكس"><img src="logo-wide.svg" alt="NovaMetrics نوﭬاميتريكس"></div>
     <div style="text-align:center;margin-top:16px">
       <div style="width:56px;height:56px;border-radius:50%;background:var(--amber-tint);color:var(--amber);display:grid;place-items:center;margin:0 auto 14px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:26px;height:26px"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div>
       <h2 style="margin:0 0 8px">${TR('حسابك قيد المراجعة','Your account is under review')}</h2>
@@ -2593,7 +2596,7 @@ function financeReportHTML(){
   const rsec=(title,html)=>`<div class="fin-report-sec"><h3 class="fin-report-t">${title}</h3>${html}</div>`;
   return `
   <div class="card panel fin-report-head">
-    <div class="brand"><div class="mark">${MARK_SVG}</div>${brandBlock(18)}</div>
+    <div class="nm-logo" style="--logo-h:36px" aria-label="NovaMetrics نوﭬاميتريكس"><img src="logo-wide.svg" alt="NovaMetrics نوﭬاميتريكس"></div>
     <div style="flex:1"></div>
     <div style="text-align:${isRTL()?'left':'right'}">
       <div style="font-weight:800;font-size:18px">${TR('التقرير المالي السنوي','Annual Financial Report')}</div>
