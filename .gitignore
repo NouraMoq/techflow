@@ -75,3 +75,13 @@ node_modules/
 # Claude Code local tooling/config (contains local settings)
 .claude/
 content-maker/tsconfig.tsbuildinfo
+
+# ملفات Office المؤقتة
+~$*
+
+# بقايا بناء لمشروع آخر — لا مصادر فيه
+/ijlal-platform/
+
+# مواد تجارية (عروض ومقترحات عملاء) — المستودع عام، فلا تدخل فيه
+/novametrics-pitch.pptx
+/novametrics-proposal/
